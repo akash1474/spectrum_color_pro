@@ -1,0 +1,13 @@
+packages/*/*
+bin/
+.cache/
+compile_commands.json
+*.vcxproj
+*.ini
+!packages/imgui/premake5.lua
+!packages/glfw/premake5.lua
+*.sln
+*.filters
+*.user
+.vs
+*.log

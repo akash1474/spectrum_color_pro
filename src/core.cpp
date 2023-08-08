@@ -1,0 +1,331 @@
+#include "imgui.h"
+#include "pch.h"
+#include "core.h"
+
+COLORREF GetColorAtCursorPos()
+{
+    POINT cursorPos;
+    GetCursorPos(&cursorPos);
+    HDC hScreenDC = GetDC(NULL);
+    COLORREF color = GetPixel(hScreenDC, cursorPos.x, cursorPos.y);
+    ReleaseDC(NULL, hScreenDC);
+    return color;
+}
+
+ImVec4 RGBAToHSL(const ImVec4& rgba) {
+    float r = rgba.x;
+    float g = rgba.y;
+    float b = rgba.z;
+
+    float maxChannel = max(max(r, g), b);
+    float minChannel = min(min(r, g), b);
+
+    float h = 0.0f;
+    float s = 0.0f;
+    float l = (maxChannel + minChannel) / 2.0f;
+
+    float delta = maxChannel - minChannel;
+
+    if (delta != 0.0f) {
+        s = delta / (1.0f - std::abs(2.0f * l - 1.0f));
+
+        if (maxChannel == r) {
+            h = (g - b) / delta + (g < b ? 6.0f : 0.0f);
+        } else if (maxChannel == g) {
+            h = (b - r) / delta + 2.0f;
+        } else if (maxChannel == b) {
+            h = (r - g) / delta + 4.0f;
+        }
+
+        h /= 6.0f;
+    }
+
+    return ImVec4(h, s, l, rgba.w);
+}
+
+float HueToRGB(float p, float q, float t) {
+    if (t < 0.0f) t += 1.0f;
+    if (t > 1.0f) t -= 1.0f;
+    if (t < 1.0f / 6.0f) return p + (q - p) * 6.0f * t;
+    if (t < 1.0f / 2.0f) return q;
+    if (t < 2.0f / 3.0f) return p + (q - p) * (2.0f / 3.0f - t) * 6.0f;
+    return p;
+}
+
+ImVec4 HSLToRGBA(const ImVec4& hsl) {
+    float h = hsl.x;
+    float s = hsl.y;
+    float l = hsl.z;
+
+    float q = l < 0.5f ? l * (1.0f + s) : l + s - l * s;
+    float p = 2.0f * l - q;
+
+    float r = HueToRGB(p, q, h + 1.0f / 3.0f);
+    float g = HueToRGB(p, q, h);
+    float b = HueToRGB(p, q, h - 1.0f / 3.0f);
+
+    return ImVec4(r, g, b, hsl.w);
+}
+
+
+
+ImVec4 RGBAToHSV(const ImVec4& rgba) {
+    float r = rgba.x;
+    float g = rgba.y;
+    float b = rgba.z;
+
+    float maxChannel = max(max(r, g), b);
+    float minChannel = min(min(r, g), b);
+
+    float h = 0.0f;
+    float s = 0.0f;
+    float v = maxChannel;
+
+    float delta = maxChannel - minChannel;
+
+    if (delta != 0.0f) {
+        s = delta / maxChannel;
+
+        if (maxChannel == r) {
+            h = (g - b) / delta + (g < b ? 6.0f : 0.0f);
+        } else if (maxChannel == g) {
+            h = (b - r) / delta + 2.0f;
+        } else if (maxChannel == b) {
+            h = (r - g) / delta + 4.0f;
+        }
+
+        h /= 6.0f;
+    }
+    return ImVec4(h, s, v, rgba.w);
+}
+
+void CoreSystem::renderMenuBar()
+{
+    ImGui::BeginMenuBar();
+    if (ImGui::BeginMenu("File")) {
+        ImGui::MenuItem("RGB Format");
+        ImGui::MenuItem("HSL Format");
+        ImGui::MenuItem("HSV Format");
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Options")) {
+        if (ImGui::MenuItem("Show Pallet", 0, showPallet)) showPallet = !showPallet;
+        if (ImGui::MenuItem("Show FPS", 0, showFps)) showFps = !showFps;
+        if (ImGui::MenuItem("Enable Vsync", 0, vSync)) {
+            vSync = !vSync;
+            vSync ? glfwSwapInterval(1) : glfwSwapInterval(0);
+        }
+        ImGui::MenuItem("Monochromatic colors");
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Help",true)) {
+        ImGui::Spacing();
+        ImGui::Text("©Akash Pandit. All Rights Reserved");
+        ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::Text("Version: 0.1.0");
+        ImGui::Text("GitHub: github.com/akash1474");
+        ImGui::Separator();
+        if(ImGui::MenuItem("Help","F1")) showHelp=true;
+        ImGui::EndMenu();
+    }
+    if (showFps) {
+        static char fps[16];
+        sprintf_s(fps, "%.2f FPS", ImGui::GetIO().Framerate);
+        float posx = (width - ImGui::CalcTextSize(fps).x) - 10;
+        ImGui::SetCursorPos({posx, 0});
+        ImGui::Text("%s", fps);
+    }
+    ImGui::EndMenuBar();
+}
+std::string format_hsv(std::string& format,ImVec4& color){
+    std::string final_str;
+    bool isFloat=format[0]=='f';
+    size_t i=0;
+    if(isFloat) ++i;
+    float factor=1000.0f;
+    ImVec4 hsv = RGBAToHSV(color);
+    hsv.w=color.w;
+    while(i<format.size()){
+        if(format[i]=='$'){
+            switch(format[++i]){
+            case 'h':
+                final_str+= isFloat ? std::to_string(float(round(hsv.x*factor))/factor).substr(0,5) :std::to_string(int(round(hsv.x*360)));
+                break;
+            case 's':
+                final_str+= isFloat ? std::to_string(float(round(hsv.y*factor))/factor).substr(0,5) : std::to_string(int(round(hsv.y*100)));
+                break;
+            case 'l':
+                final_str+= isFloat ? std::to_string(float(round(hsv.z*factor))/factor).substr(0,5) : std::to_string(int(round(hsv.z*100)));
+                break;
+            case 'a':
+                final_str+= isFloat ? std::to_string(float(round(hsv.w*factor))/factor).substr(0,5) : std::to_string(int(round(hsv.w*100)));
+                break;
+            }
+        }else{
+            final_str+=format[i];
+        }
+        ++i;
+    }
+    return final_str;
+
+}
+
+std::string format_rgb(std::string& format,ImVec4& color){
+    std::string final_str;
+    bool isFloat=format[0]=='f';
+    size_t i=0;
+    if(isFloat) ++i;
+    float factor=1000.0f;
+    while(i<format.size()){
+        if(format[i]=='$'){
+            switch(format[++i]){
+            case 'r':
+                final_str+= isFloat ? std::to_string(float(round(color.x*factor))/factor).substr(0,5) :std::to_string(int(round(color.x*255)));
+                break;
+            case 'g':
+                final_str+= isFloat ? std::to_string(float(round(color.y*factor))/factor).substr(0,5) : std::to_string(int(round(color.y*255)));
+                break;
+            case 'b':
+                final_str+= isFloat ? std::to_string(float(round(color.z*factor))/factor).substr(0,5) : std::to_string(int(round(color.z*255)));
+                break;
+            case 'a':
+                final_str+= isFloat ? std::to_string(float(round(color.w*factor))/factor).substr(0,5) : std::to_string(int(round(color.w*255)));
+                break;
+            }
+        }else{
+            final_str+=format[i];
+        }
+        ++i;
+    }
+    return final_str;
+}
+
+void CoreSystem::updateShades(){
+    ImVec4 hsl=RGBAToHSL(color);
+    hsl.y=0.704918;
+    hsl.z=0.119590;
+    shades[0]=HSLToRGBA(hsl);
+    hsl.y=0.557377;
+    hsl.z=0.239181;
+    shades[1]=HSLToRGBA(hsl);
+    hsl.y=0.557522;
+    hsl.z=0.443073;
+    shades[2]=HSLToRGBA(hsl);
+    hsl.y=0.562614;
+    hsl.z=0.641083;
+    shades[3]=HSLToRGBA(hsl);
+    hsl.y=0.554416;
+    hsl.z=0.929277;
+    shades[4]=HSLToRGBA(hsl);
+}
+
+void CoreSystem::render()
+{
+    ImGui::ShowDemoWindow();
+    static bool isPicking = false;
+    COLORREF colorx = GetColorAtCursorPos();
+
+    static bool saved_palette_init = true;
+    if (saved_palette_init) {
+        for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++) {
+            ImGui::ColorConvertHSVtoRGB(n / 40.0f, 0.8f, 0.8f, saved_palette[n].x, saved_palette[n].y, saved_palette[n].z);
+            saved_palette[n].w = 1.0f; // Alpha
+        }
+        saved_palette_init = false;
+    }
+
+
+    ImGui::SetNextWindowPos({0, 0});
+    #ifndef GL_DEBUG
+    ImGui::SetNextWindowSize({width, showPallet ? height : height-125});
+    #endif
+    ImGui::Begin("##ColorPicker", 0,
+        #ifndef GL_DEBUG
+        ImGuiWindowFlags_NoResize | 
+        #endif
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar);
+
+    renderMenuBar();
+    if(ImGui::ColorPicker4("##picker", (float*)&color,ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_AlphaBar)){
+        updateShades();
+    }
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    ImGui::Text("Current");
+    ImGui::ColorButton("##current", color, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(60, 30));
+    ImGui::Text("Shades");
+    for(size_t i=0;i<shades.size();i++){
+        if (ImGui::ColorButton("##previous", shades[i], ImGuiColorEditFlags_NoPicker,ImVec2(60, 30))) color = shades[i];
+    }
+    ImGui::EndGroup();
+    ImGui::Button(ICON_FA_EYE_DROPPER "  Pick Color", {100, 0});
+    if (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left)) isPicking = true;
+    if (isPicking && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) isPicking = false;
+    if (isPicking) {
+        int red = GetRValue(colorx);
+        int green = GetGValue(colorx);
+        int blue = GetBValue(colorx);
+        color.x = red * 0.003921;
+        color.y = green * 0.003921;
+        color.z = blue * 0.003921;
+        updateShades();
+    }
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left, false)) isPicking = false;
+    ImGui::SameLine();
+    ImGui::Button(ICON_FA_BOOKMARK "  Save", ImVec2{100, 0});
+
+    if(ImGui::Button(ICON_FA_COPY "  Hex", ImVec2{100, 0})){
+        std::stringstream stream;
+        stream << "#" << std::hex;
+        int r=int(round(color.x*255));
+        int g=int(round(color.y*255));
+        int b=int(round(color.z*255));
+        int a=int(round(color.w*255));
+        r<16 ? stream << "0" << r : stream << r;
+        g<16 ? stream << "0" << g : stream << g;
+        b<16 ? stream << "0" << b : stream << b;
+        a<16 ? stream << "0" << a : stream << a;
+        GL_INFO(stream.str());
+        ImGui::SetClipboardText(stream.str().c_str());
+    }
+    ImGui::SameLine();
+    if(ImGui::Button(ICON_FA_COPY "  RGB", ImVec2{100, 0})){
+        std::string text=format_rgb(rgb_format,color);
+        GL_INFO(text);
+        ImGui::SetClipboardText(text.c_str());
+    }
+    if(ImGui::Button(ICON_FA_COPY "  HSV", ImVec2{100, 0})){
+        std::string text=format_hsv(hsv_format,color);
+        GL_INFO(text);
+        ImGui::SetClipboardText(text.c_str());
+    }
+    ImGui::SameLine();
+    if(ImGui::Button(ICON_FA_COPY "  HSL", ImVec2{100, 0})){
+        std::string text=format_hsv(hsv_format,color);
+        ImVec4 hsl=RGBAToHSL(color);
+        GL_INFO("h:{} s:{} l:{}",hsl.x,hsl.y,hsl.z);
+        // GL_INFO("r:{} g:{} b:{}",color.x,color.y,color.z);
+        // ImVec4 rgb=HSLToRGBA(hsl);
+        // GL_INFO("r:{} g:{} b:{}",rgb.x,rgb.y,rgb.z);
+    }
+    if (showPallet) {
+        ImGui::Separator();
+        ImGui::Text("Palette");
+        float width = ImGui::GetWindowWidth();
+        int count = width / (20 + ImGui::GetStyle().ItemSpacing.y + 0.5f);
+        for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++) {
+            ImGui::PushID(n);
+            if ((n % count) != 0) ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.y);
+
+            ImGuiColorEditFlags palette_button_flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
+            if (ImGui::ColorButton("##palette", saved_palette[n], palette_button_flags, ImVec2(20, 20))){
+                color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w);
+                updateShades();
+            }
+
+            ImGui::PopID();
+        }
+    }
+    ImGui::End();
+}
