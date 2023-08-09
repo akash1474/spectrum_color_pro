@@ -1,7 +1,5 @@
 #include <vector>
 #include "imgui.h"
-#ifndef PALLET_H
-#define PALLET_H
 std::vector<std::vector<ImVec4>> pallets={
 	{
 		ImVec4(0.376,0.424,0.22,1.000),
@@ -1483,4 +1481,3 @@ std::vector<std::vector<ImVec4>> pallets={
 		ImVec4(1.0,0.933,0.886,1.000)
 	}
 };
-#endif

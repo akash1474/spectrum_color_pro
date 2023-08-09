@@ -1,6 +1,9 @@
 #include "imgui.h"
 #include "pch.h"
 #include "core.h"
+#include "pallet.h"
+#include <winuser.h>
+
 
 COLORREF GetColorAtCursorPos()
 {
@@ -220,9 +223,60 @@ void CoreSystem::updateShades(){
     shades[4]=HSLToRGBA(hsl);
 }
 
-void CoreSystem::render()
-{
-    ImGui::ShowDemoWindow();
+bool CoreSystem::Pallet(const char* idx,std::vector<ImVec4>& colors,const bool isDisabled){
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    if (window->SkipItems) return false;
+
+    ImGuiContext& g = *GImGui;
+    const ImGuiStyle& style = g.Style;
+    const ImGuiID id = window->GetID(idx);
+
+
+
+    const ImVec2 size(window->Size.x-25,50.0f);
+    const float clr_width=round(size.x/colors.size());
+    ImVec2 pos=window->DC.CursorPos;
+    const ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
+    ImGui::ItemSize(bb,0);
+    if (!ImGui::ItemAdd(bb, id)) return false;
+
+    bool isHovered=false;
+    bool isClicked=ImGui::ButtonBehavior(bb,id,&isHovered,0,ImGuiButtonFlags_AllowOverlap);
+
+    for(size_t i=0;i<colors.size();i++){
+        ImVec2 p_min(pos.x+i*clr_width,pos.y);
+        ImVec2 p_max(p_min.x+clr_width,pos.y+size.y);
+        static const std::string colorId(std::string("Color_"+std::to_string(i)));
+        const ImGuiID id_color = window->GetID(colorId.c_str());
+        float rounding=0.0f;
+        if(i==0 || i==(colors.size()-1)) rounding=4.0f;
+        ImDrawFlags flags=ImDrawFlags_None;
+        if(i==0) flags|=ImDrawFlags_RoundCornersLeft;
+        if(i==colors.size()-1) flags|=ImDrawFlags_RoundCornersRight;
+        window->DrawList->AddRectFilled(p_min,p_max,ImColor(colors[i]),rounding,flags);
+        if(isDisabled){
+            const ImRect color_bb(p_min,p_max);
+            bool isColorHovered=false;
+            if(ImGui::ButtonBehavior(color_bb, id_color, &isColorHovered,0,ImGuiButtonFlags_PressedOnClick)) this->color=colors[i];
+            if(isColorHovered) window->DrawList->AddRectFilled(p_min,p_max,ImColor(255,255,255,100));
+        }
+        
+    }
+    if(isHovered && !isDisabled) window->DrawList->AddRectFilled(bb.Min,bb.Max,ImColor(255,255,255,80),4.0f);
+    return isClicked;
+}
+
+void CoreSystem::renderPallets(){
+    ImGui::Text("Pallets");
+    ImGui::Separator();
+    int i=0;
+    for(auto& pallet:pallets){
+       if(Pallet(std::to_string(1000+i).c_str(),pallet)) p_idx=i;
+       i++;
+    }
+}
+
+void CoreSystem::renderPicker(){
     static bool isPicking = false;
     COLORREF colorx = GetColorAtCursorPos();
 
@@ -235,18 +289,6 @@ void CoreSystem::render()
         saved_palette_init = false;
     }
 
-
-    ImGui::SetNextWindowPos({0, 0});
-    #ifndef GL_DEBUG
-    ImGui::SetNextWindowSize({width, showPallet ? height : height-125});
-    #endif
-    ImGui::Begin("##ColorPicker", 0,
-        #ifndef GL_DEBUG
-        ImGuiWindowFlags_NoResize | 
-        #endif
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar);
-
-    renderMenuBar();
     if(ImGui::ColorPicker4("##picker", (float*)&color,ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_AlphaBar)){
         updateShades();
     }
@@ -256,7 +298,7 @@ void CoreSystem::render()
     ImGui::ColorButton("##current", color, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(60, 30));
     ImGui::Text("Shades");
     for(size_t i=0;i<shades.size();i++){
-        if (ImGui::ColorButton("##previous", shades[i], ImGuiColorEditFlags_NoPicker,ImVec2(60, 30))) color = shades[i];
+        if (ImGui::ColorButton(std::string("##shade_"+std::to_string(i)).c_str(), shades[i], ImGuiColorEditFlags_NoPicker,ImVec2(60, 30))) color = shades[i];
     }
     ImGui::EndGroup();
     ImGui::Button(ICON_FA_EYE_DROPPER "  Pick Color", {100, 0});
@@ -309,9 +351,15 @@ void CoreSystem::render()
         // ImVec4 rgb=HSLToRGBA(hsl);
         // GL_INFO("r:{} g:{} b:{}",rgb.x,rgb.y,rgb.z);
     }
+    if(p_idx!=-1){
+        ImGui::Separator();
+        ImGui::Text("Pallet");
+        Pallet("##SelectedPallet",pallets[p_idx],true);
+        ImGui::Spacing();
+    }
     if (showPallet) {
         ImGui::Separator();
-        ImGui::Text("Palette");
+        ImGui::Text("Colors");
         float width = ImGui::GetWindowWidth();
         int count = width / (20 + ImGui::GetStyle().ItemSpacing.y + 0.5f);
         for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++) {
@@ -326,6 +374,35 @@ void CoreSystem::render()
 
             ImGui::PopID();
         }
+    }
+}
+
+void CoreSystem::render()
+{
+    ImGui::ShowDemoWindow();
+    ImGui::SetNextWindowPos({0, 0});
+    // #ifndef GL_DEBUG
+    // ImGui::SetNextWindowSize({width, showPallet ? height : height-125});
+    // #endif
+    ImGui::Begin("##ColorPicker", 0,
+        #ifndef GL_DEBUG
+        ImGuiWindowFlags_NoResize | 
+        #endif
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar);
+
+    renderMenuBar();
+    if(ImGui::BeginTabBar("TabBar",ImGuiTabBarFlags_None)){
+
+        if(ImGui::BeginTabItem("Picker")){
+            renderPicker();
+            ImGui::EndTabItem();
+        }
+
+        if(ImGui::BeginTabItem("Pallets")){
+            renderPallets();
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
     }
     ImGui::End();
 }
