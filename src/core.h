@@ -6,7 +6,10 @@
 class CoreSystem{
 	ImVec4 saved_palette[40] = {};
     ImVec4 color;
-    bool showPallet=true;
+    bool showPallet=false;
+    bool showColors=true;
+    bool showShades=true;
+    bool showTints=true;
     size_t p_idx=-1;
     bool showFps=false;
     bool vSync=true;
@@ -21,7 +24,7 @@ class CoreSystem{
 public:
     float width{0.0f};
     float height{0.0f};
-	CoreSystem():color(ImVec4(1.0f, 0.0f, 1.0f, 1.0f)){
+	CoreSystem():color(ImVec4(0.432,0.173,0.691,1.000)){
 		updateShades();
 	}
 	void render();

@@ -1,3 +1,4 @@
+#include "FontAwesome6.h"
 #include "imgui.h"
 #include "pch.h"
 #include "core.h"
@@ -111,8 +112,16 @@ void CoreSystem::renderMenuBar()
         ImGui::MenuItem("HSV Format");
         ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("View")) {
+        if (ImGui::MenuItem("Color Pallet", 0, showColors)) showColors = !showColors;
+        if (ImGui::MenuItem("Shades", 0, showShades)) showShades = !showShades;
+        if (ImGui::MenuItem("Tints", 0, showTints)) showTints = !showTints;
+        ImGui::MenuItem("Last Color");
+        ImGui::MenuItem("Mini Picker");
+        ImGui::MenuItem("Monochromatic colors");
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("Options")) {
-        if (ImGui::MenuItem("Show Pallet", 0, showPallet)) showPallet = !showPallet;
         if (ImGui::MenuItem("Show FPS", 0, showFps)) showFps = !showFps;
         if (ImGui::MenuItem("Enable Vsync", 0, vSync)) {
             vSync = !vSync;
@@ -242,7 +251,6 @@ bool CoreSystem::Pallet(const char* idx,std::vector<ImVec4>& colors,const bool i
 
     bool isHovered=false;
     bool isClicked=ImGui::ButtonBehavior(bb,id,&isHovered,0,ImGuiButtonFlags_AllowOverlap);
-
     for(size_t i=0;i<colors.size();i++){
         ImVec2 p_min(pos.x+i*clr_width,pos.y);
         ImVec2 p_max(p_min.x+clr_width,pos.y+size.y);
@@ -257,8 +265,10 @@ bool CoreSystem::Pallet(const char* idx,std::vector<ImVec4>& colors,const bool i
         if(isDisabled){
             const ImRect color_bb(p_min,p_max);
             bool isColorHovered=false;
+            // const ImVec2 points[2]={p_min,ImVec2(p_max.x,p_min.y),p_max,ImVec2(p_min.x,p_max.y)};
             if(ImGui::ButtonBehavior(color_bb, id_color, &isColorHovered,0,ImGuiButtonFlags_PressedOnClick)) this->color=colors[i];
-            if(isColorHovered) window->DrawList->AddRectFilled(p_min,p_max,ImColor(255,255,255,100));
+            if(isColorHovered) window->DrawList->AddRectFilled(p_min,p_max,ImColor(255,255,255,80));
+            if(isColorHovered) window->DrawList->AddLine(ImVec2(p_max.x-10,p_max.y+5),ImVec2(p_min.x+10,p_max.y+5),ImColor(255,255,255,255), 2.0f);
         }
         
     }
@@ -268,12 +278,17 @@ bool CoreSystem::Pallet(const char* idx,std::vector<ImVec4>& colors,const bool i
 
 void CoreSystem::renderPallets(){
     ImGui::Text("Pallets");
+    ImGui::BeginChild("##Pallets",ImVec2(width,height-50),0,ImGuiWindowFlags_NoTitleBar);
     ImGui::Separator();
     int i=0;
     for(auto& pallet:pallets){
-       if(Pallet(std::to_string(1000+i).c_str(),pallet)) p_idx=i;
+       if(Pallet(std::to_string(1000+i).c_str(),pallet)){
+            p_idx=i;
+            showPallet=true;
+       }
        i++;
     }
+    ImGui::EndChild();
 }
 
 void CoreSystem::renderPicker(){
@@ -301,7 +316,7 @@ void CoreSystem::renderPicker(){
         if (ImGui::ColorButton(std::string("##shade_"+std::to_string(i)).c_str(), shades[i], ImGuiColorEditFlags_NoPicker,ImVec2(60, 30))) color = shades[i];
     }
     ImGui::EndGroup();
-    ImGui::Button(ICON_FA_EYE_DROPPER "  Pick Color", {100, 0});
+    ImGui::Button(ICON_FA_EYE_DROPPER "  Pick Color", {120, 0});
     if (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left)) isPicking = true;
     if (isPicking && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) isPicking = false;
     if (isPicking) {
@@ -315,9 +330,9 @@ void CoreSystem::renderPicker(){
     }
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left, false)) isPicking = false;
     ImGui::SameLine();
-    ImGui::Button(ICON_FA_BOOKMARK "  Save", ImVec2{100, 0});
+    ImGui::Button(ICON_FA_BOOKMARK "  Save", ImVec2{120, 0});
 
-    if(ImGui::Button(ICON_FA_COPY "  Hex", ImVec2{100, 0})){
+    if(ImGui::Button(ICON_FA_COPY "  Hex", ImVec2{120, 0})){
         std::stringstream stream;
         stream << "#" << std::hex;
         int r=int(round(color.x*255));
@@ -332,18 +347,18 @@ void CoreSystem::renderPicker(){
         ImGui::SetClipboardText(stream.str().c_str());
     }
     ImGui::SameLine();
-    if(ImGui::Button(ICON_FA_COPY "  RGB", ImVec2{100, 0})){
+    if(ImGui::Button(ICON_FA_COPY "  RGB", ImVec2{120, 0})){
         std::string text=format_rgb(rgb_format,color);
         GL_INFO(text);
         ImGui::SetClipboardText(text.c_str());
     }
-    if(ImGui::Button(ICON_FA_COPY "  HSV", ImVec2{100, 0})){
+    if(ImGui::Button(ICON_FA_COPY "  HSV", ImVec2{120, 0})){
         std::string text=format_hsv(hsv_format,color);
         GL_INFO(text);
         ImGui::SetClipboardText(text.c_str());
     }
     ImGui::SameLine();
-    if(ImGui::Button(ICON_FA_COPY "  HSL", ImVec2{100, 0})){
+    if(ImGui::Button(ICON_FA_COPY "  HSL", ImVec2{120, 0})){
         std::string text=format_hsv(hsv_format,color);
         ImVec4 hsl=RGBAToHSL(color);
         GL_INFO("h:{} s:{} l:{}",hsl.x,hsl.y,hsl.z);
@@ -351,15 +366,41 @@ void CoreSystem::renderPicker(){
         // ImVec4 rgb=HSLToRGBA(hsl);
         // GL_INFO("r:{} g:{} b:{}",rgb.x,rgb.y,rgb.z);
     }
-    if(p_idx!=-1){
+    bool s_visible=ImGui::GetCurrentWindow()->ContentSize.y > ImGui::GetWindowSize().y;
+    float b_pos=s_visible ? ImGui::GetWindowWidth()-40.0f :ImGui::GetWindowWidth()-30.0f;
+    if(showPallet){
         ImGui::Separator();
         ImGui::Text("Pallet");
+        ImGui::SameLine(b_pos);
+        if(ImGui::Button(ICON_FA_XMARK"##xpallet",ImVec2(20,20))) showPallet=false;
         Pallet("##SelectedPallet",pallets[p_idx],true);
         ImGui::Spacing();
     }
-    if (showPallet) {
+    if(showShades){
+        ImGui::Separator();
+        ImGui::Text("Shades");
+        ImGui::SameLine(b_pos);
+        if(ImGui::Button(ICON_FA_XMARK"##xshades",ImVec2(20,20))) showShades=!showShades;
+        static std::vector<ImVec4> shades(7,ImVec4());
+        for(int i=0;i<shades.size();i++) shades[i]=darkerShade(color,i*0.1428);
+        Pallet("##color_shades",shades,true);
+        ImGui::Spacing();
+    }
+    if(showTints){
+        ImGui::Separator();
+        ImGui::Text("Tints");
+        ImGui::SameLine(b_pos);
+        if(ImGui::Button(ICON_FA_XMARK"##xtints",ImVec2(20,20))) showTints=!showTints;
+        static std::vector<ImVec4> tints(7,ImVec4());
+        for(int i=0;i<tints.size();i++) tints[i]=lighterShade(color,i*0.1428);
+        Pallet("##color_shades",tints,true);
+        ImGui::Spacing();
+    }
+    if (showColors) {
         ImGui::Separator();
         ImGui::Text("Colors");
+        ImGui::SameLine(b_pos);
+        if(ImGui::Button(ICON_FA_XMARK"##xcolors",ImVec2(20,20))) showColors=!showColors;
         float width = ImGui::GetWindowWidth();
         int count = width / (20 + ImGui::GetStyle().ItemSpacing.y + 0.5f);
         for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++) {
@@ -382,7 +423,7 @@ void CoreSystem::render()
     ImGui::ShowDemoWindow();
     ImGui::SetNextWindowPos({0, 0});
     // #ifndef GL_DEBUG
-    // ImGui::SetNextWindowSize({width, showPallet ? height : height-125});
+    // ImGui::SetNextWindowSize({width, showColors ? height : height-125});
     // #endif
     ImGui::Begin("##ColorPicker", 0,
         #ifndef GL_DEBUG

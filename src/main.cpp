@@ -75,6 +75,7 @@ int main(void)
     style.FrameRounding = 2.0f;
     style.ItemSpacing.y = 6.0f;
     style.ScrollbarRounding = 2.0f;
+    StyleColorsDracula();
 
     while (!glfwWindowShouldClose(window)) {
         glfwGetWindowSize(window, &width, &height);
@@ -124,7 +125,7 @@ void initFonts(){
 
     ImFontConfig font_config;
     font_config.FontDataOwnedByAtlas = false;
-    io.Fonts->AddFontFromMemoryTTF((void*)data_font, font_data_size, 16, &font_config);
+    io.Fonts->AddFontFromMemoryTTF((void*)data_font, font_data_size, 18, &font_config);
     io.Fonts->AddFontFromMemoryTTF((void*)data_icon, icon_data_size, 20 * 2.0f / 3.0f, &icon_config, icons_ranges);
 }
 
