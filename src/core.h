@@ -6,6 +6,7 @@
 class CoreSystem{
 	ImVec4 saved_palette[40] = {};
     ImVec4 color;
+    ImVec4 pcolor;
     bool showPallet=false;
     bool showColors=true;
     bool showShades=true;
@@ -13,6 +14,8 @@ class CoreSystem{
     size_t p_idx=-1;
     bool showFps=false;
     bool vSync=true;
+    bool showMonochromatic=true;
+    bool showPrevColor=true;
     bool showHelp{false};
     void updateShades();
     void renderPallets();
