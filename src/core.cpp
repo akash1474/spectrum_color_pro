@@ -107,9 +107,9 @@ void CoreSystem::renderMenuBar()
 {
     ImGui::BeginMenuBar();
     if (ImGui::BeginMenu("File")) {
-        ImGui::MenuItem("RGB Format");
-        ImGui::MenuItem("HSL Format");
-        ImGui::MenuItem("HSV Format");
+        ImGui::MenuItem("Pallets");
+        ImGui::MenuItem("Settings");
+        ImGui::MenuItem("Exit");
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("View")) {
@@ -117,8 +117,8 @@ void CoreSystem::renderMenuBar()
         if (ImGui::MenuItem("Shades", 0, showShades)) showShades = !showShades;
         if (ImGui::MenuItem("Tints", 0, showTints)) showTints = !showTints;
         if (ImGui::MenuItem("Last Color",0,showPrevColor)) showPrevColor=!showPrevColor;
-        if (ImGui::MenuItem("Monochromatic colors",0,showMonochromatic)) showMonochromatic=!showMonochromatic;
-        ImGui::MenuItem("Mini Picker");
+        // if (ImGui::MenuItem("Monochromatic colors",0,showMonochromatic)) showMonochromatic=!showMonochromatic;
+        // ImGui::MenuItem("Mini Picker");
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Options")) {
@@ -127,7 +127,6 @@ void CoreSystem::renderMenuBar()
             vSync = !vSync;
             vSync ? glfwSwapInterval(1) : glfwSwapInterval(0);
         }
-        ImGui::MenuItem("Monochromatic colors");
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Help",true)) {
@@ -144,7 +143,7 @@ void CoreSystem::renderMenuBar()
     if (showFps) {
         static char fps[16];
         sprintf_s(fps, "%.2f FPS", ImGui::GetIO().Framerate);
-        float posx = (width - ImGui::CalcTextSize(fps).x) - 10;
+        float posx = (ImGui::GetWindowWidth() - ImGui::CalcTextSize(fps).x) - 10;
         ImGui::SetCursorPos({posx, 0});
         ImGui::Text("%s", fps);
     }
@@ -281,7 +280,7 @@ bool CoreSystem::Pallet(const char* idx,std::vector<ImVec4>& colors,const bool i
 
 void CoreSystem::renderPallets(){
     ImGui::Text("Pallets");
-    ImGui::BeginChild("##Pallets",ImVec2(width,height-50),0,ImGuiWindowFlags_NoTitleBar);
+    ImGui::BeginChild("##Pallets",ImVec2(ImGui::GetWindowWidth()-10,ImGui::GetContentRegionAvail().y),0,ImGuiWindowFlags_NoTitleBar);
     ImGui::Separator();
     int i=0;
     for(auto& pallet:pallets){
@@ -293,6 +292,29 @@ void CoreSystem::renderPallets(){
     }
     ImGui::EndChild();
 }
+
+struct Animation{
+    float duration=0.0f;
+    float currDuration=0.0f;
+    float tick=0.0f;
+    Animation(float duration=1.0f):duration{duration}{
+        currDuration=duration;
+    }
+    bool isDone(){ return currDuration >= duration;}
+    void begin(){currDuration=0.0f;}
+    float update(){
+        if(isDone()) return duration;
+        currDuration+=ImGui::GetIO().DeltaTime;
+        tick=currDuration/duration;
+        if(currDuration >= duration){
+            tick=1.0f; 
+            currDuration=duration;
+            return currDuration;
+        }else{
+            return currDuration;
+        }
+    }
+};
 
 void CoreSystem::renderPicker(){
     static bool isPicking = false;
@@ -307,10 +329,7 @@ void CoreSystem::renderPicker(){
         }
         saved_palette_init = false;
     }
-    // const ImRect bb(ImGui::GetCursorPos(),{ImGui::GetWindowWidth()-10,ImGui::GetCursorPos().y+60.0f});
-    // ImGui::GetCurrentWindow()->DrawList->AddRectFilled(bb.Min,bb.Max,ImColor(color),4.0f);
-    // ImGui::ItemSize(bb,0);
-    // ImGui::ItemAdd(bb, ImGui::GetCurrentWindow()->GetID("##currClr"));
+
     ImGui::ColorButton("##current", color, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(ImGui::GetWindowWidth()-(s_visible ? 30.0f:15.0f), 30));
     ImGui::SetNextItemWidth(-FLT_MIN);
     if(ImGui::ColorPicker4("##picker", (float*)&color,ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_AlphaBar)){
@@ -331,7 +350,8 @@ void CoreSystem::renderPicker(){
     //     }
     // }
     // ImGui::EndGroup();
-    ImGui::Button(ICON_FA_EYE_DROPPER "  Pick Color", {120, 0});
+    float width= s_visible ? ImGui::GetWindowWidth()-38 : ImGui::GetWindowWidth()-25;
+    ImGui::Button(ICON_FA_EYE_DROPPER "  Pick Color",{width+8,0});
     if (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left)) isPicking = true;
     if (isPicking && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) isPicking = false;
     if (isPicking) {
@@ -344,10 +364,16 @@ void CoreSystem::renderPicker(){
         updateShades();
     }
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left, false)) isPicking = false;
-    ImGui::SameLine();
-    ImGui::Button(ICON_FA_BOOKMARK "  Save", ImVec2{120, 0});
+    // ImGui::SameLine();
+    // ImGui::Button(ICON_FA_BOOKMARK "  Save", {width*0.5f,0});
 
-    if(ImGui::Button(ICON_FA_COPY "  Hex", ImVec2{120, 0})){
+
+    static Animation hexCopy(2.0f);
+    static char* hxBtn;
+    if(hexCopy.isDone()) hxBtn=(ICON_FA_COPY"  Hex");
+    else hxBtn=(ICON_FA_CHECK"  Copied");
+    if(ImGui::Button(hxBtn, {width*0.5f,0})){
+        hexCopy.begin();
         std::stringstream stream;
         stream << "#" << std::hex;
         int r=int(round(color.x*255));
@@ -361,26 +387,51 @@ void CoreSystem::renderPicker(){
         GL_INFO(stream.str());
         ImGui::SetClipboardText(stream.str().c_str());
     }
+    hexCopy.update();
+
     ImGui::SameLine();
-    if(ImGui::Button(ICON_FA_COPY "  RGB", ImVec2{120, 0})){
+    static Animation rgbAnim(2.0f);
+    static char* rgbBtn;
+    if(rgbAnim.isDone()) rgbBtn=(ICON_FA_COPY"  RGB");
+    else rgbBtn=(ICON_FA_CHECK"  Copied");
+    if(ImGui::Button(rgbBtn, {width*0.5f,0})){
         std::string text=format_rgb(rgb_format,color);
         GL_INFO(text);
         ImGui::SetClipboardText(text.c_str());
+        rgbAnim.begin();
     }
-    if(ImGui::Button(ICON_FA_COPY "  HSV", ImVec2{120, 0})){
+    rgbAnim.update();
+
+
+    static Animation hsvAnim(2.0f);
+    static char* hsv_btn;
+    if(hsvAnim.isDone()) hsv_btn=(ICON_FA_COPY"  HSV");
+    else hsv_btn=(ICON_FA_CHECK"  Copied");
+    if(ImGui::Button(hsv_btn, {width*0.5f,0})){
         std::string text=format_hsv(hsv_format,color);
         GL_INFO(text);
         ImGui::SetClipboardText(text.c_str());
+        hsvAnim.begin();
     }
+    hsvAnim.update();
+
     ImGui::SameLine();
-    if(ImGui::Button(ICON_FA_COPY "  HSL", ImVec2{120, 0})){
+    static Animation hslAnim(2.0f);
+    static char* hsl_btn;
+    if(hslAnim.isDone()) hsl_btn=(ICON_FA_COPY"  HSL");
+    else hsl_btn=(ICON_FA_CHECK"  Copied");
+    if(ImGui::Button(hsl_btn, {width*0.5f,0})){
         std::string text=format_hsv(hsv_format,color);
         ImVec4 hsl=RGBAToHSL(color);
         GL_INFO("h:{} s:{} l:{}",hsl.x,hsl.y,hsl.z);
         // GL_INFO("r:{} g:{} b:{}",color.x,color.y,color.z);
         // ImVec4 rgb=HSLToRGBA(hsl);
         // GL_INFO("r:{} g:{} b:{}",rgb.x,rgb.y,rgb.z);
+        hslAnim.begin();
     }
+    hslAnim.update();
+
+
     float b_pos=s_visible ? ImGui::GetWindowWidth()-40.0f :ImGui::GetWindowWidth()-30.0f;
     if(showPallet){
         ImGui::Separator();
@@ -448,7 +499,6 @@ void CoreSystem::render()
 
     renderMenuBar();
     if(ImGui::BeginTabBar("TabBar",ImGuiTabBarFlags_None)){
-
         if(ImGui::BeginTabItem("Picker")){
             renderPicker();
             ImGui::EndTabItem();

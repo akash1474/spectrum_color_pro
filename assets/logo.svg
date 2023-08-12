@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="none" viewBox="0 0 64 64">
+  <mask id="a" width="64" height="64" x="0" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha">
+    <rect width="64" height="64" fill="#D9D9D9" rx="12"/>
+  </mask>
+  <g mask="url(#a)">
+    <circle cx="25" cy="25" r="52" fill="#4F4BFA"/>
+    <circle cx="5" cy="9" r="52" fill="#4C6DFA"/>
+    <circle cx="7" cy="5" r="27" fill="#4C9CFF"/>
+  </g>
+  <path fill="url(#b)" d="M52 32.5v.206c-.03 2.78-2.56 4.669-5.34 4.669h-7.457a3.657 3.657 0 0 0-3.58 4.41c.16.777.495 1.524.823 2.278.464 1.051.921 2.095.921 3.2 0 2.421-1.645 4.623-4.067 4.722-.267.007-.533.015-.808.015C21.73 52 13 43.27 13 32.5S21.73 13 32.5 13 52 21.73 52 32.5Zm-29.25 2.438a2.438 2.438 0 1 0-4.875 0 2.438 2.438 0 0 0 4.875 0Zm0-7.313a2.438 2.438 0 1 0 0-4.875 2.438 2.438 0 0 0 0 4.875Zm12.188-7.313a2.438 2.438 0 1 0-4.876 0 2.438 2.438 0 0 0 4.875 0Zm7.312 7.313a2.438 2.438 0 1 0 0-4.875 2.438 2.438 0 0 0 0 4.875Z"/>
+  <defs>
+    <linearGradient id="b" x1="18" x2="47" y1="20" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>
