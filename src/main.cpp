@@ -78,6 +78,7 @@ int main(void)
     StyleColorsDracula();
 
     while (!glfwWindowShouldClose(window)) {
+        if(!core.isRunning) break;
         glfwGetWindowSize(window, &width, &height);
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -125,7 +126,7 @@ void initFonts(){
 
     ImFontConfig font_config;
     font_config.FontDataOwnedByAtlas = false;
-    io.Fonts->AddFontFromMemoryTTF((void*)data_font, font_data_size, 18, &font_config);
+    io.Fonts->AddFontFromMemoryTTF((void*)data_font, font_data_size, 16, &font_config);
     io.Fonts->AddFontFromMemoryTTF((void*)data_icon, icon_data_size, 20 * 2.0f / 3.0f, &icon_config, icons_ranges);
 }
 

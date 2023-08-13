@@ -2,6 +2,7 @@
 #include "string"
 #include <array>
 #include <vector>
+#include "ini.h"
 
 class CoreSystem{
 	ImVec4 saved_palette[40] = {};
@@ -11,25 +12,38 @@ class CoreSystem{
     bool showColors=true;
     bool showShades=true;
     bool showTints=true;
-    size_t p_idx=-1;
+    bool saveState=false;
+    bool saveSize=false;
+    int p_idx=-1;
     bool showFps=false;
     bool vSync=true;
     bool showMonochromatic=true;
     bool showPrevColor=true;
-    bool showHelp{false};
+    bool showAboutPage{true};
     void updateShades();
     void renderPallets();
     void renderPicker();
+    void renderSettings();
+    void renderAboutPage();
     bool Pallet(const char* idx,std::vector<ImVec4>& colors,const bool isDisabled=false);
-    std::string rgb_format{"fImVec4($r,$g,$b,$a)"};
-    std::string hsv_format{"hsla($h,$s%,$l%,$a)"};
+    std::string rgb_format{"rgba($r,$g,$b,$a)"};
+    std::string hsv_format{"hsva($h,$s%,$v%,$a)"};
+    std::string hsl_format{"hsla($h,$s%,$l%,$a)"};
     std::array<ImVec4,5> shades;
+
+    //Save Config
+    mINI::INIFile* file{0};
+    mINI::INIStructure ini;
+    std::string usrRootDir{0};
+    bool updateSettings=false;
+    void saveSettings();
+    bool showSettings=false;
+
 public:
+    bool isRunning=true;
     float width{0.0f};
     float height{0.0f};
-	CoreSystem():color(ImVec4(0.432,0.173,0.691,1.000)){
-		updateShades();
-	}
+	CoreSystem();
 	void render();
 	void renderMenuBar();
 };

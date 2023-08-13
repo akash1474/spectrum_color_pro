@@ -12,12 +12,15 @@ includeDirs={}
 includeDirs["glfw"]="packages/glfw/include"
 includeDirs["SpdLog"]="packages/spdlog/include"
 includeDirs["ImGui"]="packages/imgui"
+includeDirs["Mini"]="packages/mini"
+includeDirs["LunaSVG"]="packages/lunasvg/include"
 
 -- /MP -- Multithreaded build 
 -- /MT -- Static Linking. Defines _MT 
 -- /MD -- Dynamic Linking. Defines _MT and _DLL 
 include "packages/glfw"
 include "packages/imgui"
+include "packages/lunasvg"
 
 project "color_picker"
    kind "ConsoleApp"
@@ -29,13 +32,15 @@ project "color_picker"
    pchsource "src/pch.cpp"
 
    links {
-      "glfw","ImGui","opengl32"
+      "glfw","ImGui","LunaSVG","opengl32"
    }
 
    includedirs{
       "src",
       "%{includeDirs.glfw}",
       "%{includeDirs.ImGui}",
+      "%{includeDirs.Mini}",
+      "%{includeDirs.LunaSVG}",
       "%{includeDirs.SpdLog}"
    }
 

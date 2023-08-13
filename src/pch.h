@@ -20,6 +20,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl2.h"
 #include "imgui_internal.h"
+#include "ini.h"
+#include "svg.h"
 
 #include "FontAwesome6.h"
 #include "Log.h"
