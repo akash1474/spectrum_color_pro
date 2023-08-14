@@ -1,4 +1,5 @@
 #include "GLFW/glfw3.h"
+#include "Timer.h"
 #include "pch.h"
 #include "imgui.h"
 #define STB_IMAGE_IMPLEMENTATION
@@ -19,13 +20,14 @@ int width{0};
 int height{0};
 
 CoreSystem* corePtr=nullptr;
-void initFonts();
+void initFonts(int front_size);
 void draw(GLFWwindow* window);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 
 int main(void)
 {
+    OpenGL::Timer timer;
     GLFWwindow* window;
 #ifdef GL_DEBUG
     OpenGL::Log::Init();
@@ -68,17 +70,23 @@ int main(void)
 
     if (!ImGui_ImplOpenGL2_Init()) GL_ERROR("Failed to initit OpenGL 2");
 
-    initFonts();
+    initFonts(core.font_size);
 
-    glfwSwapInterval(1);
+    glfwSwapInterval(0);
     ImGuiStyle& style = ImGui::GetStyle();
     style.FrameRounding = 2.0f;
     style.ItemSpacing.y = 6.0f;
     style.ScrollbarRounding = 2.0f;
     StyleColorsDracula();
 
+    GL_WARN("[Timer] Initialization - {}",timer.ElapsedMillis());
     while (!glfwWindowShouldClose(window)) {
         if(!core.isRunning) break;
+        if(core.buildFonts){
+            initFonts(core.font_size);
+            core.buildFonts=false;
+            ImGui_ImplOpenGL2_CreateFontsTexture();
+        }
         glfwGetWindowSize(window, &width, &height);
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -106,8 +114,10 @@ int main(void)
 }
 
 
-void initFonts(){
-    GL_INFO("Initializing Fonts");
+void initFonts(int font_size){
+    #ifdef GL_DEBUG
+    OpenGL::ScopedTimer font_init("Font Build");
+    #endif
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
     #ifndef GL_DEBUG
@@ -122,12 +132,15 @@ void initFonts(){
     icon_config.FontDataOwnedByAtlas = false;
 
     const int font_data_size = IM_ARRAYSIZE(data_font);
+    const int font_data_mono_size = IM_ARRAYSIZE(data_font_mono);
     const int icon_data_size = IM_ARRAYSIZE(data_icon);
 
     ImFontConfig font_config;
     font_config.FontDataOwnedByAtlas = false;
-    io.Fonts->AddFontFromMemoryTTF((void*)data_font, font_data_size, 16, &font_config);
-    io.Fonts->AddFontFromMemoryTTF((void*)data_icon, icon_data_size, 20 * 2.0f / 3.0f, &icon_config, icons_ranges);
+    io.Fonts->AddFontFromMemoryTTF((void*)data_font, font_data_size, (float)font_size, &font_config);
+    io.Fonts->AddFontFromMemoryTTF((void*)data_icon, icon_data_size, (font_size+4) * 2.0f / 3.0f, &icon_config, icons_ranges);
+
+    io.Fonts->AddFontFromMemoryTTF((void*)data_font_mono, font_data_mono_size, (float)font_size, &font_config);
 }
 
 void draw(GLFWwindow* window)

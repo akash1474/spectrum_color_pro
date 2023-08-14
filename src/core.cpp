@@ -93,7 +93,10 @@ CoreSystem::CoreSystem():color(ImVec4(0.432,0.173,0.691,1.000)){
     if(!std::filesystem::exists(savePath)){
         //Initilze
         GL_INFO("Initializing Settings");
+        ini["settings"]["font_size"]="16";
+        ini["settings"]["default_copy"]="0";
         ini["settings"]["pallet"]="0";
+        ini["settings"]["picker_flags"]="40960272";
         ini["settings"]["colors"]="1";
         ini["settings"]["shades"]="1";
         ini["settings"]["tints"]="1";
@@ -106,6 +109,9 @@ CoreSystem::CoreSystem():color(ImVec4(0.432,0.173,0.691,1.000)){
         //Load
         GL_INFO("Loading Settings");
         if(!ini.has("settings")) ini["settings"];
+        this->font_size=ini["settings"].has("font_size") ? stoi(ini["settings"]["font_size"]): 16;
+        this->picker_flags=ini["settings"].has("picker_flags") ? stoi(ini["settings"]["picker_flags"]): 40960272;
+        this->default_copy=ini["settings"].has("default_copy") ? stoi(ini["settings"]["default_copy"]): 0;
         this->showPallet= ini["settings"].has("pallet") ? stoi(ini["settings"]["pallet"]): false;
         this->showShades= ini["settings"].has("shades") ? stoi(ini["settings"]["shades"]): true;
         this->showColors= ini["settings"].has("colors") ? stoi(ini["settings"]["colors"]): true;
@@ -121,6 +127,9 @@ CoreSystem::CoreSystem():color(ImVec4(0.432,0.173,0.691,1.000)){
 
 void CoreSystem::saveSettings(){
     GL_WARN("Saving Settings");
+    ini["settings"]["font_size"]=std::to_string(this->font_size);
+    ini["settings"]["default_copy"]=std::to_string(default_copy);
+    ini["settings"]["picker_flags"]=std::to_string(this->picker_flags);
     ini["settings"]["pallet"]=std::to_string(this->showPallet);
     ini["settings"]["shades"]=std::to_string(this->showShades);
     ini["settings"]["tints"]=std::to_string(this->showTints);
@@ -138,7 +147,10 @@ void CoreSystem::renderMenuBar()
     ImGui::BeginMenuBar();
     if (ImGui::BeginMenu("File")) {
         ImGui::MenuItem("Pallets");
-        if(ImGui::MenuItem("Settings")) showSettings=true;
+        if(ImGui::MenuItem("Settings")){
+            showSettings=true;
+            showAboutPage=false;
+        }
         if(ImGui::MenuItem("Exit")) isRunning=false;
         ImGui::EndMenu();
     }
@@ -179,7 +191,10 @@ void CoreSystem::renderMenuBar()
         ImGui::Text("Version: 0.1.0");
         ImGui::Text("GitHub: github.com/akash1474");
         ImGui::Separator();
-        if(ImGui::MenuItem("Help","F1")) showAboutPage=true;
+        if(ImGui::MenuItem("Help","F1")){
+            showAboutPage=true;
+            showSettings=false;
+        }
         ImGui::EndMenu();
     }
     if (showFps) {
@@ -407,7 +422,7 @@ void CoreSystem::renderPicker(){
 
     ImGui::ColorButton("##current", color, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(ImGui::GetWindowWidth()-(s_visible ? 30.0f:15.0f), 30));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if(ImGui::ColorPicker4("##picker", (float*)&color,ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_AlphaBar)){
+    if(ImGui::ColorPicker4("##picker", (float*)&color,picker_flags)){
         updateShades();
     }
     // ImGui::SameLine();
@@ -426,7 +441,9 @@ void CoreSystem::renderPicker(){
     // }
     // ImGui::EndGroup();
     float width= s_visible ? ImGui::GetWindowWidth()-38 : ImGui::GetWindowWidth()-25;
+    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0.176,0.176,0.309,1.000));
     ImGui::Button(ICON_FA_EYE_DROPPER "  Pick Color",{width+8,0});
+    ImGui::PopStyleColor();
     if (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left)) isPicking = true;
     if (isPicking && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) isPicking = false;
     if (isPicking) {
@@ -569,49 +586,126 @@ void CoreSystem::renderPicker(){
 }
 
 void CoreSystem::renderSettings(){
+    ImGui::AlignTextToFramePadding();
     ImGui::Text("Settings");
     ImGui::SameLine(ImGui::GetWindowWidth()-40);
     if(ImGui::Button(ICON_FA_XMARK,{25,25})) showSettings=false;
+
+
+    ImGui::SeparatorText("Configurations");
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Font Size:");
+    ImGui::SameLine();
+    if(ImGui::InputInt("##font_size",&font_size)){
+        GL_INFO("Font Size:{}",font_size);
+        buildFonts=true;
+        saveSettings();
+    }
+    static bool configs[4]={
+        !!(picker_flags & ImGuiColorEditFlags_DisplayRGB),
+        !!(picker_flags & ImGuiColorEditFlags_DisplayHSV),
+        !!(picker_flags & ImGuiColorEditFlags_DisplayHex),
+        !!(picker_flags & ImGuiColorEditFlags_PickerHueBar)
+    };
+    if (ImGui::Checkbox("Display RGB",configs)) {
+        configs[0] ? picker_flags|=ImGuiColorEditFlags_DisplayRGB : picker_flags&=~ImGuiColorEditFlags_DisplayRGB;
+        if(configs[0]){GL_INFO("Enabled");}else{GL_INFO("Disabled");}
+        updateSettings=true;
+    }
+    if (ImGui::Checkbox("Display HSV",configs+1)) {
+        updateSettings=true;
+        configs[1] ? picker_flags|=ImGuiColorEditFlags_DisplayHSV : picker_flags&=~ImGuiColorEditFlags_DisplayHSV;
+    }
+    if (ImGui::Checkbox("Display Hex",configs+2)) {
+        updateSettings=true;
+        configs[2] ? picker_flags|=ImGuiColorEditFlags_DisplayHex : picker_flags&=~ImGuiColorEditFlags_DisplayHex;
+    }
+
+    const char* items[] = {"Hex","RGB","HSL","HSV"};
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Default Copy");ImGui::SameLine();
+    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+    if(ImGui::Combo("##default_copy", &default_copy, items, IM_ARRAYSIZE(items))){
+        updateSettings=true;
+    }
+
+
+
+    ImGui::SeparatorText("Picker Type");
+    if(ImGui::RadioButton("Hue Bar",configs[3])){
+        picker_flags&=~ImGuiColorEditFlags_PickerHueWheel;
+        picker_flags|=ImGuiColorEditFlags_PickerHueBar;
+        configs[3]=true;
+        updateSettings=true;
+    }
+    ImGui::SameLine();
+    if(ImGui::RadioButton("Hue Wheel",!configs[3])){
+        picker_flags&=~ImGuiColorEditFlags_PickerHueBar;
+        picker_flags|=ImGuiColorEditFlags_PickerHueWheel;
+        configs[3]=false;
+        updateSettings=true;
+    }
+
+
+
+    // ImGui::SeparatorText("Alpha Preview");
+    // static int opt=2;
+    // if(ImGui::RadioButton("Bar",&opt,0)) picker_flags|=ImGuiColorEditFlags_AlphaBar;
+    // ImGui::SameLine();
+    // if(ImGui::RadioButton("Preview",&opt,1)) picker_flags|=ImGuiColorEditFlags_AlphaPreview;
+    // ImGui::SameLine();
+    // if(ImGui::RadioButton("Preview Half",&opt,2)) picker_flags|=ImGuiColorEditFlags_AlphaPreviewHalf;
+
+
     ImGui::SeparatorText("Copy Formatting");
+    ImGui::AlignTextToFramePadding();
     ImGui::Text("RGB");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(ImGui::GetWindowWidth()-80);
+    ImGui::SetNextItemWidth(ImGui::GetWindowWidth()-90);
     char buff[64];
     strcpy_s(buff,rgb_format.c_str());
+    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
     if(ImGui::InputText("##rgb_input", buff, IM_ARRAYSIZE(buff))) rgb_format=buff;
+    ImGui::PopFont();
     ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
     ImGui::Text(ICON_FA_CODE);
     if(ImGui::IsItemHovered()) ImGui::SetTooltip("Output: %s", format_rgb(rgb_format,color).c_str());
     ImGui::Spacing();
 
+    ImGui::AlignTextToFramePadding();
     ImGui::Text("HSV");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(ImGui::GetWindowWidth()-80);
+    ImGui::SetNextItemWidth(ImGui::GetWindowWidth()-90);
     strcpy_s(buff,hsv_format.c_str());
+    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
     if(ImGui::InputText("##hsv_input", buff, IM_ARRAYSIZE(buff))) hsv_format=buff;
+    ImGui::PopFont();
     ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
     ImGui::Text(ICON_FA_CODE);
     if(ImGui::IsItemHovered()) ImGui::SetTooltip("Output: %s", format_hsv(hsv_format,color).c_str());
     ImGui::Spacing();
 
 
+    ImGui::AlignTextToFramePadding();
     ImGui::Text("HSL");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(ImGui::GetWindowWidth()-80);
+    ImGui::SetNextItemWidth(ImGui::GetWindowWidth()-90);
     strcpy_s(buff,hsl_format.c_str());
+    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
     if(ImGui::InputText("##hsl_input", buff, IM_ARRAYSIZE(buff))) hsl_format=buff;
+    ImGui::PopFont();
     ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
     ImGui::Text(ICON_FA_CODE);
     if(ImGui::IsItemHovered()) ImGui::SetTooltip("Output: %s", format_hsl(hsl_format,color).c_str());
     ImGui::Spacing();
-    // ImGui::SeparatorText("State");
-    // ImGui::Checkbox("Preserve State", &saveState);
-    // ImGui::Checkbox("Save Window Size", &saveSize);
-    ImGui::Separator();
     ImGui::Dummy({ImGui::GetWindowWidth()-140,10});
     ImGui::SameLine();
-    if(ImGui::Button("Save Settings")) saveSettings();
+    if(ImGui::Button("Save Format")) saveSettings();
 
+    if(updateSettings) saveSettings();
 }
 
 
@@ -652,7 +746,10 @@ void CoreSystem::render()
         ImGuiWindowFlags_NoResize | 
         #endif
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar);
-
+    if(ImGui::IsKeyPressed(ImGuiKey_Escape)){
+        showSettings=false;
+        showAboutPage=false;
+    }
     renderMenuBar();
     if(showSettings){
         renderSettings();

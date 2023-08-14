@@ -8,6 +8,9 @@ class CoreSystem{
 	ImVec4 saved_palette[40] = {};
     ImVec4 color;
     ImVec4 pcolor;
+    //ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_AlphaBar
+    ImGuiColorEditFlags picker_flags;
+    int default_copy=0;
     bool showPallet=false;
     bool showColors=true;
     bool showShades=true;
@@ -19,7 +22,7 @@ class CoreSystem{
     bool vSync=true;
     bool showMonochromatic=true;
     bool showPrevColor=true;
-    bool showAboutPage{true};
+    bool showAboutPage{false};
     void updateShades();
     void renderPallets();
     void renderPicker();
@@ -37,10 +40,12 @@ class CoreSystem{
     std::string usrRootDir{0};
     bool updateSettings=false;
     void saveSettings();
-    bool showSettings=false;
+    bool showSettings=true;
 
 public:
     bool isRunning=true;
+    int font_size=16;
+    bool buildFonts=false;
     float width{0.0f};
     float height{0.0f};
 	CoreSystem();
