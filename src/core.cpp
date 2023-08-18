@@ -180,6 +180,7 @@ void CoreSystem::saveSettings(){
 
     //saving usr_colors
     ini["settings"]["showUsrColors"]=std::to_string(this->showUsrColors);
+    ini.remove("usr_colors");
     for (size_t i = 0; i < usr_colors.size(); ++i) {
         const ImVec4& color = usr_colors[i];
         uint32_t colorHex = ImGui::ColorConvertFloat4ToU32(color);
@@ -692,6 +693,7 @@ void CoreSystem::renderPicker(){
         float width = ImGui::GetContentRegionAvail().x;
         int count = width / (20.0f+6.0f);
         size_t n = 0;
+        bool isChanged=false;
         for (auto it=usr_colors.begin();it!=usr_colors.end();++it) {
             ImGui::PushID(n);
             if ((n % count) != 0) ImGui::SameLine();
@@ -703,6 +705,7 @@ void CoreSystem::renderPicker(){
             }
             if(ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right,false)){
                 GL_INFO("Deleted {}",n);
+                isChanged=true;
                 if(n==(usr_colors.size()-1)){
                     this->usr_colors.pop_back();
                     ImGui::PopID();
@@ -715,6 +718,7 @@ void CoreSystem::renderPicker(){
             n++;
             ImGui::PopID();
         }
+        if(isChanged) updateSettings=true;
         ImGui::Spacing();
     }
 
