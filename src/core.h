@@ -23,7 +23,7 @@ class CoreSystem{
     bool vSync=true;
     bool showMonochromatic=true;
     bool showPrevColor=true;
-    bool showAboutPage=true;
+    bool showAboutPage=false;
 
     std::vector<ImVec4> usr_colors;
     bool showUsrColors=true;

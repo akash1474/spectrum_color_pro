@@ -40,11 +40,7 @@ int main(void)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_ANY_PROFILE);
 
     window = glfwCreateWindow(WIDTH, HEIGHT, "Color Picker", NULL, NULL);
-    #ifdef GL_DEBUG 
     glfwSetWindowSizeLimits(window, 270, 405, GLFW_DONT_CARE, GLFW_DONT_CARE);
-    #else
-    glfwSetWindowSizeLimits(window, 270, 405, 320, 442);
-    #endif
 
     if (!window) {
         glfwTerminate();
@@ -139,7 +135,6 @@ void initFonts(int font_size){
     font_config.FontDataOwnedByAtlas = false;
     io.Fonts->AddFontFromMemoryTTF((void*)data_font, font_data_size, (float)font_size, &font_config);
     io.Fonts->AddFontFromMemoryTTF((void*)data_icon, icon_data_size, (font_size+4) * 2.0f / 3.0f, &icon_config, icons_ranges);
-
     io.Fonts->AddFontFromMemoryTTF((void*)data_font_mono, font_data_mono_size, (float)(font_size+2), &font_config);
 }
 

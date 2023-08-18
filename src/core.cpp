@@ -1,14 +1,17 @@
 #include "FontAwesome6.h"
 #include "GLFW/glfw3.h"
 #include "Log.h"
+#include "images.h"
 #include "imgui.h"
 #include "pch.h"
 #include "core.h"
 #include "pallet.h"
+#include <shellapi.h>
 #include <stdint.h>
 #include <string.h>
+#include <vcruntime.h>
 #include <winuser.h>
-
+#include "stb_img.h"
 
 COLORREF GetColorAtCursorPos()
 {
@@ -191,7 +194,6 @@ void CoreSystem::renderMenuBar()
 {
     ImGui::BeginMenuBar();
     if (ImGui::BeginMenu("File")) {
-        ImGui::MenuItem("Pallets");
         if(ImGui::MenuItem("Settings")){
             showSettings=true;
             showAboutPage=false;
@@ -445,10 +447,12 @@ struct Animation{
     float duration=0.0f;
     float currDuration=0.0f;
     float tick=0.0f;
+    bool hasStarted=false;
     Animation(float duration=1.0f):duration{duration}{}
-    bool isDone(){ return currDuration >= duration;}
-    void begin(){currDuration=0.0f;}
+    bool isDone(){ return currDuration == duration || !hasStarted;}
+    void begin(){currDuration=0.0f;hasStarted=true;}
     float update(){
+        if(!hasStarted) return 0.0f;
         if(isDone()) return duration;
         currDuration+=ImGui::GetIO().DeltaTime;
         tick=currDuration/duration;
@@ -572,7 +576,7 @@ void CoreSystem::renderPicker(){
         GL_INFO(hexCode);
         ImGui::SetClipboardText(hexCode.c_str());
     }
-    hexCopy.update();
+    if(hexCopy.hasStarted) hexCopy.update();
 
     ImGui::SameLine();
     static Animation rgbAnim(2.0f);
@@ -585,7 +589,7 @@ void CoreSystem::renderPicker(){
         ImGui::SetClipboardText(text.c_str());
         rgbAnim.begin();
     }
-    rgbAnim.update();
+    if(rgbAnim.hasStarted) rgbAnim.update();
 
 
     static Animation hsvAnim(2.0f);
@@ -598,7 +602,7 @@ void CoreSystem::renderPicker(){
         ImGui::SetClipboardText(text.c_str());
         hsvAnim.begin();
     }
-    hsvAnim.update();
+    if(hsvAnim.hasStarted) hsvAnim.update();
 
     ImGui::SameLine();
     static Animation hslAnim(2.0f);
@@ -611,7 +615,7 @@ void CoreSystem::renderPicker(){
         ImGui::SetClipboardText(text.c_str());
         hslAnim.begin();
     }
-    hslAnim.update();
+    if(hslAnim.hasStarted) hslAnim.update();
 
 
     float b_pos=ImGui::GetContentRegionAvail().x-10.0f;
@@ -869,6 +873,14 @@ void RenderCard(const char* id,float height,ImVec4 title_color,const char* title
     // ImGui::SetCursorPos({ImGui::GetCursorPos().x,ImGui::GetCursorPos().y+})
 }
 
+void CircleImage(unsigned int texture_id, float diameter, const ImVec2& uv0 = ImVec2(0, 0), const ImVec2& uv1 = ImVec2(1, 1), const ImVec4& tint_col = ImVec4(1, 1, 1, 1))
+{
+    ImVec2 p_min = ImGui::GetCursorScreenPos();
+    ImVec2 p_max = ImVec2(p_min.x + diameter, p_min.y + diameter);
+    ImGui::GetWindowDrawList()->AddImageRounded((void*)(intptr_t)texture_id, p_min, p_max, uv0, uv1, ImGui::GetColorU32(tint_col), diameter * 0.5f);
+    ImGui::Dummy(ImVec2(diameter, diameter));
+}
+
 void CoreSystem::renderAboutPage(){
     static bool isLoaded=false;
     static SVG svg;
@@ -886,11 +898,20 @@ void CoreSystem::renderAboutPage(){
     ImGui::SetCursorPos({(size.x-ImGui::CalcTextSize("Color Picker").x)*0.5f,y});
     ImGui::Text("Color Picker");
     y+=ImGui::GetTextLineHeightWithSpacing();
+
     ImGui::SetCursorPos({(size.x-ImGui::CalcTextSize("v1.0.1").x)*0.5f,y});
     ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.428,0.371,0.529,1.000));
     ImGui::Text("v1.0.0");
     ImGui::PopStyleColor();
-    ImGui::Dummy({ImGui::GetContentRegionAvail().x,50});
+
+    y+=ImGui::GetTextLineHeightWithSpacing();
+    ImGui::SetCursorPos({(size.x-100.0f)*0.5f,y});
+    ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.906,0.435,0.318,1.000));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImGui::GetStyle().Colors[ImGuiCol_Button]);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImGui::GetStyle().Colors[ImGuiCol_Button]);
+    ImGui::Button("Mini Project",{100,0});
+    ImGui::PopStyleColor(3);
+    ImGui::Dummy({ImGui::GetContentRegionAvail().x,20});
 
     const char* key_bindings_help="Ctrl+C - Copy Color To Clipboard\n\nYou can change the default copy format in the settings. The Default Copy format can be changed by selecting and of the drop downs";
     const char* copy_formatting_help=
@@ -925,15 +946,79 @@ void CoreSystem::renderAboutPage(){
     RenderCard("##color_pallets",(60.0f+s3.y),ImVec4(0.522,1.000,0.510,1.000),"Color Pallets",color_pallets_help);
     RenderCard("##saved_colors",(60.f+s4.y),ImVec4(0.647,0.482,1.000,1.000),"Saved Colors",saved_colors_help);
 
+
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.137,0.137,0.180,1.000));
+    ImGui::BeginChild("##developer",ImVec2(ImGui::GetContentRegionAvail().x+5.0f,250), true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+    ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.906,0.435,0.318,1.000));
+    ImGui::Text("%s", "Developer");
+
+    ImGui::PushStyleColor(ImGuiCol_Separator,ImVec4(0.906,0.435,0.318,1.000));
+    ImGui::Separator();
+    ImGui::PopStyleColor(2);
+
+    const char* name="Akash Pandit";
+    const char* title="Software Application Developer";
+    static bool isImageLoadedGithub=false;
+    static unsigned int texture;
+    if(!isImageLoadedGithub){
+        int width,height;
+        unsigned char* data=stbi_load_from_memory(github_profile, IM_ARRAYSIZE(github_profile),&width,&height, 0, 4); 
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        GL_INFO("WIDTH:{},HEIGHT:{}",width,height);
+        stbi_image_free(data);
+        isImageLoadedGithub=true;
+    }
+
+    // ImGui::Image((void*)(intptr_t)texture,{64,64});
+    ImGui::SetCursorPos({(ImGui::GetContentRegionAvail().x-64.0f)*0.5f,50.0f});
+    CircleImage(texture,64);
+
+    ImGui::SetCursorPos({(ImGui::GetContentRegionAvail().x-ImGui::CalcTextSize(name).x)*0.5f,120});
+    ImGui::Text("%s", name);
+
+    ImGui::SetCursorPos({(ImGui::GetContentRegionAvail().x-ImGui::CalcTextSize(title).x)*0.5f,145});
+    ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.428,0.371,0.529,1.000));
+    ImGui::Text("%s", title);
+    ImGui::PopStyleColor();
+
+    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0.353,0.380,1.000,1.000));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(0.452,0.471,0.904,1.000));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(0.348,0.370,0.872,1.000));
+    ImGui::SetCursorPos({(ImGui::GetContentRegionAvail().x-120.0f)*0.5f,190});
+    if(ImGui::Button("Github",ImVec2(120,0))) ShellExecuteA(0, 0,std::string("https://github.com/akash1474/color_picker").c_str(), 0, 0 , SW_SHOW );
+    ImGui::PopStyleColor(3);
+
+
+    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0.937,0.278,0.435,1.000));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(0.995,0.434,0.567,1.000));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,ImVec4(0.888,0.283,0.427,1.000));
+    ImGui::SetCursorPos({(ImGui::GetContentRegionAvail().x-120.0f)*0.5f,220});
+    if(ImGui::Button("Report Bugs",ImVec2(120,0))) ShellExecuteA(0, 0, std::string("https://github.com/akash1474/color_picker/issues").c_str(), 0, 0 , SW_SHOW );
+    ImGui::PopStyleColor(3);
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
 
 void CoreSystem::render()
 {
     ImGui::ShowDemoWindow();
     ImGui::SetNextWindowPos({0, 0});
-    // #ifndef GL_DEBUG
-    // ImGui::SetNextWindowSize({width, showColors ? height : height-125});
-    // #endif
+    #ifndef GL_DEBUG
+    ImGui::SetNextWindowSize({width, showColors ? height : height-125});
+    #endif
+
+    if(ImGui::IsKeyPressed(ImGuiKey_F1)){
+        this->showAboutPage=true;
+        this->showSettings=false;
+    }
+
     ImGui::Begin("##ColorPicker", 0,
         #ifndef GL_DEBUG
         ImGuiWindowFlags_NoResize | 
