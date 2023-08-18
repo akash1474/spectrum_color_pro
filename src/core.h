@@ -11,6 +11,7 @@ class CoreSystem{
     //ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_AlphaBar
     ImGuiColorEditFlags picker_flags;
     int default_copy=0;
+    bool load_last_color=false;
     bool showPallet=false;
     bool showColors=true;
     bool showShades=true;
@@ -22,7 +23,11 @@ class CoreSystem{
     bool vSync=true;
     bool showMonochromatic=true;
     bool showPrevColor=true;
-    bool showAboutPage{false};
+    bool showAboutPage=true;
+
+    std::vector<ImVec4> usr_colors;
+    bool showUsrColors=true;
+
     void updateShades();
     void renderPallets();
     void renderPicker();
@@ -40,7 +45,7 @@ class CoreSystem{
     std::string usrRootDir{0};
     bool updateSettings=false;
     void saveSettings();
-    bool showSettings=true;
+    bool showSettings=false;
 
 public:
     bool isRunning=true;

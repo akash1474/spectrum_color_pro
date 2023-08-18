@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "core.h"
 #include "pallet.h"
+#include <stdint.h>
 #include <string.h>
 #include <winuser.h>
 
@@ -17,6 +18,20 @@ COLORREF GetColorAtCursorPos()
     COLORREF color = GetPixel(hScreenDC, cursorPos.x, cursorPos.y);
     ReleaseDC(NULL, hScreenDC);
     return color;
+}
+
+std::string RGBATOHEX(const ImVec4& color){
+    std::stringstream stream;
+    stream << "#" << std::hex;
+    int r=int(round(color.x*255));
+    int g=int(round(color.y*255));
+    int b=int(round(color.z*255));
+    int a=int(round(color.w*255));
+    r<16 ? stream << "0" << r : stream << r;
+    g<16 ? stream << "0" << g : stream << g;
+    b<16 ? stream << "0" << b : stream << b;
+    a<16 ? stream << "0" << a : stream << a;
+    return stream.str(); 
 }
 
 ImVec4 RGBAToHSL(const ImVec4& rgba) {
@@ -95,31 +110,50 @@ CoreSystem::CoreSystem():color(ImVec4(0.432,0.173,0.691,1.000)){
         GL_INFO("Initializing Settings");
         ini["settings"]["font_size"]="16";
         ini["settings"]["default_copy"]="0";
+        ini["settings"]["load_last_color"]="0";
+        ini["settings"]["last_color"]="0";
         ini["settings"]["pallet"]="0";
         ini["settings"]["picker_flags"]="40960272";
-        ini["settings"]["colors"]="1";
+        ini["settings"]["show_colors"]="1";
         ini["settings"]["shades"]="1";
         ini["settings"]["tints"]="1";
         ini["settings"]["pid"]="-1";
         ini["settings"]["rgb"]="rgba($r,$g,$b,$a)";
         ini["settings"]["hsl"]="hsla($h,$s%,$l%,$a)";
         ini["settings"]["hsv"]="hsva($h,$s%,$v%,$a)";
+        ini["settings"]["showUsrColors"]="1";
         file->write(ini,true);
     }else{
         //Load
         GL_INFO("Loading Settings");
         if(!ini.has("settings")) ini["settings"];
         this->font_size=ini["settings"].has("font_size") ? stoi(ini["settings"]["font_size"]): 16;
+        if(this->font_size < 10) this->font_size=10;
         this->picker_flags=ini["settings"].has("picker_flags") ? stoi(ini["settings"]["picker_flags"]): 40960272;
         this->default_copy=ini["settings"].has("default_copy") ? stoi(ini["settings"]["default_copy"]): 0;
+        this->load_last_color=ini["settings"].has("load_last_color") ? stoi(ini["settings"]["load_last_color"]): 0;
+        if(this->load_last_color){
+            this->color=ini["settings"].has("last_color") ? ImGui::ColorConvertU32ToFloat4(stoul(ini["settings"]["last_color"])) : this->color;
+        }
         this->showPallet= ini["settings"].has("pallet") ? stoi(ini["settings"]["pallet"]): false;
         this->showShades= ini["settings"].has("shades") ? stoi(ini["settings"]["shades"]): true;
-        this->showColors= ini["settings"].has("colors") ? stoi(ini["settings"]["colors"]): true;
+        this->showColors= ini["settings"].has("show_colors") ? stoi(ini["settings"]["show_colors"]): true;
         this->showTints= ini["settings"].has("tints") ? stoi(ini["settings"]["tints"]): true;
         this->p_idx= ini["settings"].has("pid") ? stoi(ini["settings"]["pid"]) : -1;
         this->rgb_format= ini["settings"].has("rgb") ? ini["settings"]["rgb"]: "rgba($r,$g,$b,$a)";
         this->hsl_format= ini["settings"].has("hsl") ? ini["settings"]["hsl"]: "hsla($h,$s%,$l%,$a)";
         this->hsv_format= ini["settings"].has("hsv") ? ini["settings"]["hsv"]: "hsva($h,$s%,$v%,$a)";
+
+        //loading usr colors
+        this->showUsrColors=ini["settings"].has("showUsrColors") ? stoi(ini["settings"]["showUsrColors"]) : 1;
+        if(ini.has("usr_colors")){
+            GL_INFO(" USR LOADED:");
+            for(auto const& it:ini["usr_colors"]){
+                this->usr_colors.push_back(ImGui::ColorConvertU32ToFloat4(stoul(it.second)));
+                GL_INFO("\t{}",it.second);
+            }
+        }
+        
         saveSettings();
     }
     updateShades();
@@ -130,14 +164,25 @@ void CoreSystem::saveSettings(){
     ini["settings"]["font_size"]=std::to_string(this->font_size);
     ini["settings"]["default_copy"]=std::to_string(default_copy);
     ini["settings"]["picker_flags"]=std::to_string(this->picker_flags);
+    ini["settings"]["load_last_color"]=std::to_string(this->load_last_color);
+    ini["settings"]["last_color"]=std::to_string(ImGui::ColorConvertFloat4ToU32(this->color));
     ini["settings"]["pallet"]=std::to_string(this->showPallet);
     ini["settings"]["shades"]=std::to_string(this->showShades);
     ini["settings"]["tints"]=std::to_string(this->showTints);
-    ini["settings"]["colors"]=std::to_string(this->showColors);
+    ini["settings"]["show_colors"]=std::to_string(this->showColors);
     ini["settings"]["pid"]=(p_idx >= 0) ? std::to_string(p_idx) : "-1";
     ini["settings"]["rgb"]=this->rgb_format;
     ini["settings"]["hsv"]=this->hsv_format;
     ini["settings"]["hsl"]=this->hsl_format;
+
+    //saving usr_colors
+    ini["settings"]["showUsrColors"]=std::to_string(this->showUsrColors);
+    for (size_t i = 0; i < usr_colors.size(); ++i) {
+        const ImVec4& color = usr_colors[i];
+        uint32_t colorHex = ImGui::ColorConvertFloat4ToU32(color);
+        ini["usr_colors"]["color_" + std::to_string(i)]=std::to_string(colorHex);
+    }
+
     file->write(ini,true);
     this->updateSettings=false;
 }
@@ -167,12 +212,10 @@ void CoreSystem::renderMenuBar()
             showTints = !showTints;
             this->updateSettings=true;
         }
-        if (ImGui::MenuItem("Last Color",0,showPrevColor)){
-            showPrevColor=!showPrevColor;
+        if (ImGui::MenuItem("Saved Colors",0,showUsrColors)){
+            showUsrColors=!showUsrColors;
             this->updateSettings=true;
         }
-        // if (ImGui::MenuItem("Monochromatic colors",0,showMonochromatic)) showMonochromatic=!showMonochromatic;
-        // ImGui::MenuItem("Mini Picker");
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Options")) {
@@ -188,7 +231,7 @@ void CoreSystem::renderMenuBar()
         ImGui::Text("©Akash Pandit. All Rights Reserved");
         ImGui::Spacing();
         ImGui::Spacing();
-        ImGui::Text("Version: 0.1.0");
+        ImGui::Text("Version: 1.0.0");
         ImGui::Text("GitHub: github.com/akash1474");
         ImGui::Separator();
         if(ImGui::MenuItem("Help","F1")){
@@ -328,20 +371,35 @@ bool CoreSystem::Pallet(const char* idx,std::vector<ImVec4>& colors,const bool i
     const ImGuiStyle& style = g.Style;
     const ImGuiID id = window->GetID(idx);
 
+    const ImVec2 container_size(ImGui::GetContentRegionAvail().x,90);
 
-
-    const ImVec2 size(window->Size.x-25,50.0f);
+    const ImVec2 size(isDisabled ? ImGui::GetContentRegionAvail().x : ImGui::GetContentRegionAvail().x-20,50.0f);
     const float clr_width=round(size.x/colors.size());
     ImVec2 pos=window->DC.CursorPos;
-    const ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
+    ImRect bb;
+    if(isDisabled){
+        bb=ImRect(pos, ImVec2(pos.x + size.x, pos.y + size.y));
+    }else{
+        bb=ImRect(pos, ImVec2(pos.x + container_size.x, pos.y + container_size.y));
+    }
+
     ImGui::ItemSize(bb,0);
     if (!ImGui::ItemAdd(bb, id)) return false;
 
+    if(!isDisabled){
+        window->DrawList->AddRectFilled({pos.x,pos.y},{pos.x+container_size.x,pos.y+container_size.y},ImColor(ImVec4(0.129,0.129,0.169,1.000)));
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+        ImGui::RenderText({pos.x+10,pos.y+5}, ("#"+(std::string(idx).substr(1,3))).c_str());
+        ImGui::PopFont();
+        // ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.958,0.269,0.706,1.000));
+        // ImGui::RenderText({container_size.x-20,pos.y+5}, ICON_FA_HEART);
+        // ImGui::PopStyleColor();
+    }
     bool isHovered=false;
     bool isClicked=ImGui::ButtonBehavior(bb,id,&isHovered,0,ImGuiButtonFlags_AllowOverlap);
     for(size_t i=0;i<colors.size();i++){
-        ImVec2 p_min(pos.x+i*clr_width,pos.y);
-        ImVec2 p_max(p_min.x+clr_width,pos.y+size.y);
+        ImVec2 p_min =isDisabled ? ImVec2{pos.x+i*clr_width,pos.y} : ImVec2{pos.x+10+i*clr_width,pos.y+30};
+        ImVec2 p_max(p_min.x+clr_width,p_min.y+size.y);
         static const std::string colorId(std::string("Color_"+std::to_string(i)));
         const ImGuiID id_color = window->GetID(colorId.c_str());
         float rounding=0.0f;
@@ -363,7 +421,7 @@ bool CoreSystem::Pallet(const char* idx,std::vector<ImVec4>& colors,const bool i
         }
         
     }
-    if(isHovered && !isDisabled) window->DrawList->AddRectFilled(bb.Min,bb.Max,ImColor(255,255,255,80),4.0f);
+    if(isHovered && !isDisabled) window->DrawList->AddRectFilled(bb.Min,bb.Max,ImColor(255,255,255,40),4.0f);
     return isClicked;
 }
 
@@ -387,9 +445,7 @@ struct Animation{
     float duration=0.0f;
     float currDuration=0.0f;
     float tick=0.0f;
-    Animation(float duration=1.0f):duration{duration}{
-        currDuration=duration;
-    }
+    Animation(float duration=1.0f):duration{duration}{}
     bool isDone(){ return currDuration >= duration;}
     void begin(){currDuration=0.0f;}
     float update(){
@@ -406,8 +462,25 @@ struct Animation{
     }
 };
 
+
+void Notification(const char* msg,float tick){
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    float m_tick=tick >=0.5 ? 1.0f : tick+0.5;
+    ImGui::SetNextWindowPos(ImVec2((windowSize.x-windowSize.x+50.0f) * 0.5f, windowSize.y - (50.0f*m_tick)));
+    ImGui::SetNextWindowSize({windowSize.x-50,0});
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,5.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg,ImColor(0.10f, 0.10f, 0.10f, 1.00f*m_tick).Value);
+    ImGui::Begin("Notification", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::TextWrapped("%s", msg);
+    ImGui::End();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+}
+
 void CoreSystem::renderPicker(){
     static bool isPicking = false;
+    static bool showNotification=false;
+    static Animation notify(2.0f);
     COLORREF colorx = GetColorAtCursorPos();
     bool s_visible=ImGui::GetCurrentWindow()->ContentSize.y > ImGui::GetWindowSize().y;
 
@@ -420,10 +493,30 @@ void CoreSystem::renderPicker(){
         saved_palette_init = false;
     }
 
+    //Key Binding Default copy 
+    if(ImGui::IsKeyDown(ImGuiKey_LeftCtrl,false) && ImGui::IsKeyPressed(ImGuiKey_C,false)){
+        GL_INFO("Default Copy {}",default_copy);
+        showNotification=true;
+        notify.begin();
+        switch(default_copy){
+            case 0: ImGui::SetClipboardText(RGBATOHEX(color).c_str()); break;
+            case 1: ImGui::SetClipboardText(format_rgb(rgb_format,color).c_str()); break;
+            case 2: ImGui::SetClipboardText(format_hsl(hsl_format,color).c_str()); break;
+            case 3: ImGui::SetClipboardText(format_hsv(hsv_format,color).c_str()); break;
+        }
+    }
+    if(showNotification){
+        Notification("Default Copied",(1 + (1+1.70158) * pow(notify.tick - 1, 3) + 1.70158 * pow(notify.tick - 1, 2)));
+        notify.update();
+    }
+    if(notify.isDone()) showNotification=false;
+
     ImGui::ColorButton("##current", color, ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(ImGui::GetWindowWidth()-(s_visible ? 30.0f:15.0f), 30));
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if(ImGui::ColorPicker4("##picker", (float*)&color,picker_flags)){
-        updateShades();
+    if(ImGui::ColorPicker4("##picker", (float*)&color,picker_flags)) updateShades();
+    if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
+        GL_INFO("Picked");
+        updateSettings=true;
     }
     // ImGui::SameLine();
     // ImGui::BeginGroup();
@@ -441,11 +534,14 @@ void CoreSystem::renderPicker(){
     // }
     // ImGui::EndGroup();
     float width= s_visible ? ImGui::GetWindowWidth()-38 : ImGui::GetWindowWidth()-25;
-    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0.176,0.176,0.309,1.000));
-    ImGui::Button(ICON_FA_EYE_DROPPER "  Pick Color",{width+8,0});
+    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0.115,0.239,0.497,1.000));
+    ImGui::Button(ICON_FA_EYE_DROPPER "  Pick Color",{width*0.5f,0});
     ImGui::PopStyleColor();
     if (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left)) isPicking = true;
-    if (isPicking && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) isPicking = false;
+    if (isPicking && ImGui::IsMouseReleased(ImGuiMouseButton_Left)){
+        isPicking = false;
+        updateSettings=true;
+    }
     if (isPicking) {
         int red = GetRValue(colorx);
         int green = GetGValue(colorx);
@@ -456,8 +552,14 @@ void CoreSystem::renderPicker(){
         updateShades();
     }
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left, false)) isPicking = false;
-    // ImGui::SameLine();
-    // ImGui::Button(ICON_FA_BOOKMARK "  Save", {width*0.5f,0});
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0.165,0.476,0.472,1.000));
+    if(ImGui::Button(ICON_FA_BOOKMARK "  Save Color", {width*0.5f,0})){
+        this->usr_colors.push_back(this->color);
+        updateSettings=true;
+        GL_INFO("Added User Color [Size: {}]",usr_colors.size());
+    }
+    ImGui::PopStyleColor();
 
 
     static Animation hexCopy(2.0f);
@@ -466,18 +568,9 @@ void CoreSystem::renderPicker(){
     else hxBtn=(ICON_FA_CHECK"  Copied");
     if(ImGui::Button(hxBtn, {width*0.5f,0})){
         hexCopy.begin();
-        std::stringstream stream;
-        stream << "#" << std::hex;
-        int r=int(round(color.x*255));
-        int g=int(round(color.y*255));
-        int b=int(round(color.z*255));
-        int a=int(round(color.w*255));
-        r<16 ? stream << "0" << r : stream << r;
-        g<16 ? stream << "0" << g : stream << g;
-        b<16 ? stream << "0" << b : stream << b;
-        a<16 ? stream << "0" << a : stream << a;
-        GL_INFO(stream.str());
-        ImGui::SetClipboardText(stream.str().c_str());
+        std::string hexCode=RGBATOHEX(color);
+        GL_INFO(hexCode);
+        ImGui::SetClipboardText(hexCode.c_str());
     }
     hexCopy.update();
 
@@ -521,7 +614,7 @@ void CoreSystem::renderPicker(){
     hslAnim.update();
 
 
-    float b_pos=s_visible ? ImGui::GetWindowWidth()-40.0f :ImGui::GetWindowWidth()-30.0f;
+    float b_pos=ImGui::GetContentRegionAvail().x-10.0f;
     if(showPallet){
         ImGui::Separator();
         ImGui::Text("Pallet");
@@ -567,11 +660,11 @@ void CoreSystem::renderPicker(){
             showColors=false;
             updateSettings=true;
         }
-        float width = ImGui::GetWindowWidth();
-        int count = width / (20 + ImGui::GetStyle().ItemSpacing.y + 0.5f);
+        float width = ImGui::GetContentRegionAvail().x;
+        int count = width / (20.0f+6.0f);
         for (int n = 0; n < IM_ARRAYSIZE(saved_palette); n++) {
             ImGui::PushID(n);
-            if ((n % count) != 0) ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.y);
+            if ((n % count) != 0) ImGui::SameLine();
 
             ImGuiColorEditFlags palette_button_flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
             if (ImGui::ColorButton("##palette", saved_palette[n], palette_button_flags, ImVec2(20, 20))){
@@ -579,10 +672,48 @@ void CoreSystem::renderPicker(){
                 color = ImVec4(saved_palette[n].x, saved_palette[n].y, saved_palette[n].z, color.w);
                 updateShades();
             }
-
             ImGui::PopID();
         }
+        ImGui::Spacing();
     }
+
+    if(showUsrColors){
+        ImGui::Separator();
+        ImGui::Text("Saved Colors");
+        ImGui::SameLine(b_pos);
+        if(ImGui::Button(ICON_FA_XMARK"##xusrcolors",ImVec2(20,20))){
+            showUsrColors=false;
+            updateSettings=true;
+        }
+        float width = ImGui::GetContentRegionAvail().x;
+        int count = width / (20.0f+6.0f);
+        size_t n = 0;
+        for (auto it=usr_colors.begin();it!=usr_colors.end();++it) {
+            ImGui::PushID(n);
+            if ((n % count) != 0) ImGui::SameLine();
+            ImGuiColorEditFlags palette_button_flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
+            if (ImGui::ColorButton("##usrpalette", *it, palette_button_flags, ImVec2(20, 20))){
+                pcolor=color;
+                color = ImVec4((*it).x, (*it).y, (*it).z, color.w);
+                updateShades();
+            }
+            if(ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right,false)){
+                GL_INFO("Deleted {}",n);
+                if(n==(usr_colors.size()-1)){
+                    this->usr_colors.pop_back();
+                    ImGui::PopID();
+                    break;
+                }
+                it=this->usr_colors.erase(it);
+                ImGui::PopID();
+                continue;
+            }
+            n++;
+            ImGui::PopID();
+        }
+        ImGui::Spacing();
+    }
+
 }
 
 void CoreSystem::renderSettings(){
@@ -600,6 +731,11 @@ void CoreSystem::renderSettings(){
         GL_INFO("Font Size:{}",font_size);
         buildFonts=true;
         saveSettings();
+    }
+    if(ImGui::Checkbox("Preserve State",&load_last_color)){
+        GL_INFO(ImGui::ColorConvertFloat4ToU32(color));
+        GL_INFO(ImGui::ColorConvertU32ToFloat4(ImGui::ColorConvertFloat4ToU32(color)).x);
+        updateSettings=true;
     }
     static bool configs[4]={
         !!(picker_flags & ImGuiColorEditFlags_DisplayRGB),
@@ -708,30 +844,87 @@ void CoreSystem::renderSettings(){
     if(updateSettings) saveSettings();
 }
 
+static ImVec2 calculateSectionBoundsX(float padding) {
+  auto *window = ImGui::GetCurrentWindow();
+  float windowStart = ImGui::GetWindowPos().x;
+
+  return {windowStart + window->WindowPadding.x + padding,
+          windowStart + ImGui::GetWindowWidth() - window->WindowPadding.x -
+              padding};
+}
+
+void RenderCard(const char* id,float height,ImVec4 title_color,const char* title, const char* content) {
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.137,0.137,0.180,1.000));
+    ImGui::BeginChild(id,ImVec2(ImGui::GetContentRegionAvail().x+5.0f,height), true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+    ImGui::PushStyleColor(ImGuiCol_Text,title_color);
+    ImGui::Text("%s", title);
+
+    ImGui::PushStyleColor(ImGuiCol_Separator,title_color);
+    ImGui::Separator();
+    ImGui::PopStyleColor(2);
+    ImGui::TextWrapped("%s", content);
+
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+    // ImGui::SetCursorPos({ImGui::GetCursorPos().x,ImGui::GetCursorPos().y+})
+}
 
 void CoreSystem::renderAboutPage(){
     static bool isLoaded=false;
     static SVG svg;
-    static float y=50.f;
+    float y=100.f;
     ImGui::SetCursorPos({ImGui::GetWindowWidth()-40.0f,30.0f});
     if(ImGui::Button(ICON_FA_XMARK,{25,25})) showAboutPage=false;
     if(!isLoaded){
-        svg.load_from_buffer((const char*)logo_svg,70,70);
+        svg.load_from_buffer((const char*)logo_svg,60,60);
         isLoaded=true;
     }
     ImVec2 size=ImGui::GetWindowSize();
-    ImGui::SetCursorPos({(size.x-70.0f)*0.5f,y});
-    ImGui::Image((void*)(intptr_t)svg.texture,{70,70});
-    y+=80.0f;
+    ImGui::SetCursorPos({(size.x-60.0f)*0.5f,y});
+    ImGui::Image((void*)(intptr_t)svg.texture,{60,60});
+    y+=70.0f;
     ImGui::SetCursorPos({(size.x-ImGui::CalcTextSize("Color Picker").x)*0.5f,y});
     ImGui::Text("Color Picker");
-    y=50.0f;
-    ImGui::SeparatorText("Key Bindings");
-    ImGui::Text("» Ctrl+X : Copy Hex");
-    ImGui::Text("» Ctrl+R : Copy rgb");
-    ImGui::Text("» Ctrl+H : Copy hsl");
-    ImGui::Text("» Ctrl+J : Copy hsv");
-    ImGui::SeparatorText("About");
+    y+=ImGui::GetTextLineHeightWithSpacing();
+    ImGui::SetCursorPos({(size.x-ImGui::CalcTextSize("v1.0.1").x)*0.5f,y});
+    ImGui::PushStyleColor(ImGuiCol_Text,ImVec4(0.428,0.371,0.529,1.000));
+    ImGui::Text("v1.0.0");
+    ImGui::PopStyleColor();
+    ImGui::Dummy({ImGui::GetContentRegionAvail().x,50});
+
+    const char* key_bindings_help="Ctrl+C - Copy Color To Clipboard\n\nYou can change the default copy format in the settings. The Default Copy format can be changed by selecting and of the drop downs";
+    const char* copy_formatting_help=
+    "The \"Copy Formatting\" feature in the color picker lets you create custom color formats with placeholders for specific color components.\n\n"
+        "You can use formats like\n"
+        "\trgba($r,$g,$b,$a)\n" 
+        "\thsva($h,$s,$v,$a)\n"
+        "\thsla($h,$s,$l,$a)\n\n"
+        "Add 'f' at the start for 0 to 1 range conversion,\n"
+        "\tFrom: frgba($r,$g,$b,$a)\n"
+        "\tTo: rgba(0.256,0.89,0.456,1.000)\n\n"
+        "When you copy, placeholders turn into color values.\n";
+
+    const char* color_pallets_help=
+        "You can select from a range of predefined beautiful pallets provided.\n\n"
+        "Just click on the pallet and then go back to the picker and the pallet will be displayed in pallet section and colors can be selected and modified. \n\n"
+        "You can alter the color and then save it using the Save Color button.\n";
+
+    const char* saved_colors_help=
+        "These are the colors that are saved using the “save color” button.\n\n"
+        "You can view these colors by enabling the saved colors in the view tab of menu bar\n\n"
+        "Color can be deleted by right clicking on it.\n";
+
+
+    ImVec2 s1=ImGui::CalcTextSize(key_bindings_help,0,0,ImGui::GetWindowWidth()-50.0f);
+    ImVec2 s2=ImGui::CalcTextSize(copy_formatting_help,0,0,ImGui::GetWindowWidth()-50.0f);
+    ImVec2 s3=ImGui::CalcTextSize(color_pallets_help,0,0,ImGui::GetWindowWidth()-50.0f);
+    ImVec2 s4=ImGui::CalcTextSize(saved_colors_help,0,0,ImGui::GetWindowWidth()-50.0f);
+
+    RenderCard("##key_bindings",(60.0f+s1.y),ImVec4(0.024,0.839,0.627,1.000),"Key Bindings",key_bindings_help);
+    RenderCard("##copy_formatting",(60.0f+s2.y),ImVec4(0.298,0.612,1.000,1.000),"Copy Formatting",copy_formatting_help);
+    RenderCard("##color_pallets",(60.0f+s3.y),ImVec4(0.522,1.000,0.510,1.000),"Color Pallets",color_pallets_help);
+    RenderCard("##saved_colors",(60.f+s4.y),ImVec4(0.647,0.482,1.000,1.000),"Saved Colors",saved_colors_help);
+
 }
 
 void CoreSystem::render()

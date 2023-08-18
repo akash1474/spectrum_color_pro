@@ -29,7 +29,7 @@
 //Icon and Font
 #include "fa-solid-900.h"
 #include "recursive_linear_medium.h"
-#include "recursive_mono_medium.h"
+#include "recursive_mono_bold.h"
 #include "images.h"
 #include "utils.h"
 #include "Timer.h"
