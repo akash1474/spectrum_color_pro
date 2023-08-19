@@ -1,5 +1,7 @@
 @echo off
 set glfw=https://github.com/glfw/glfw.git
+set lunasvg=https://github.com/sammycage/lunasvg.git
+set mini=https://github.com/pulzed/mINI.git
 set spdlog=-o spdlog.zip https://codeload.github.com/gabime/spdlog/zip/refs/tags/v1.12.0
 set imgui=-o imgui.zip https://codeload.github.com/ocornut/imgui/zip/refs/tags/v1.89.7
 
@@ -12,6 +14,13 @@ curl %spdlog%
 echo.
 echo -- Downloading imgui
 curl %imgui%
+echo.
+echo -- Downloading lunasvg
+git clone --depth 1 %lunasvg%
+echo.
+echo -- Downloading mini
+git clone --depth 1 %mini% ./packages/mINI
+echo.
 
 
 
@@ -23,6 +32,17 @@ if exist glfw (
 	echo [ GLFW ] No directory found
 	exit /b
 )
+
+if exist lunasvg (
+	echo.
+	echo Setting Up LunaSVG
+	mv --force ./lunasvg/* ./packages/lunasvg
+) else (
+	echo [ LunaSVG ] No directory found
+	exit /b
+)
+
+
 echo.
 echo -- Extracting Files
 winrar x -idv spdlog.zip *

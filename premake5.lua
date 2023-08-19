@@ -12,7 +12,7 @@ includeDirs={}
 includeDirs["glfw"]="packages/glfw/include"
 includeDirs["SpdLog"]="packages/spdlog/include"
 includeDirs["ImGui"]="packages/imgui"
-includeDirs["Mini"]="packages/mini"
+includeDirs["Mini"]="packages/mINI/src/mini"
 includeDirs["LunaSVG"]="packages/lunasvg/include"
 
 -- /MP -- Multithreaded build 

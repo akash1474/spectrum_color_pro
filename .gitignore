@@ -1,4 +1,5 @@
 packages/*/*
+packages/mINI
 bin/
 .cache/
 compile_commands.json
@@ -6,6 +7,7 @@ compile_commands.json
 *.ini
 !packages/imgui/premake5.lua
 !packages/glfw/premake5.lua
+!packages/lunasvg/premake5.lua
 *.sln
 *.filters
 *.user
