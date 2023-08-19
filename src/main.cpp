@@ -39,7 +39,7 @@ int main(void)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_ANY_PROFILE);
 
-    window = glfwCreateWindow(WIDTH, HEIGHT, "Color Picker", NULL, NULL);
+    window = glfwCreateWindow(WIDTH, HEIGHT, "SpectrumColor Pro", NULL, NULL);
     glfwSetWindowSizeLimits(window, 270, 405, GLFW_DONT_CARE, GLFW_DONT_CARE);
 
     if (!window) {
@@ -68,7 +68,7 @@ int main(void)
 
     initFonts(core.font_size);
 
-    glfwSwapInterval(0);
+    glfwSwapInterval(1);
     ImGuiStyle& style = ImGui::GetStyle();
     style.FrameRounding = 2.0f;
     style.ItemSpacing.y = 6.0f;

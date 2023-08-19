@@ -560,7 +560,7 @@ void CoreSystem::renderPicker(){
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0.165,0.476,0.472,1.000));
     if(ImGui::Button(ICON_FA_BOOKMARK "  Save Color", {width*0.5f,0})){
-        this->usr_colors.push_back(this->color);
+        this->usr_colors.insert(usr_colors.begin(),this->color);
         updateSettings=true;
         GL_INFO("Added User Color [Size: {}]",usr_colors.size());
     }
@@ -899,8 +899,8 @@ void CoreSystem::renderAboutPage(){
     ImGui::SetCursorPos({(size.x-60.0f)*0.5f,y});
     ImGui::Image((void*)(intptr_t)svg.texture,{60,60});
     y+=70.0f;
-    ImGui::SetCursorPos({(size.x-ImGui::CalcTextSize("Color Picker").x)*0.5f,y});
-    ImGui::Text("Color Picker");
+    ImGui::SetCursorPos({(size.x-ImGui::CalcTextSize("SpectrumColor Pro").x)*0.5f,y});
+    ImGui::Text("SpectrumColor Pro");
     y+=ImGui::GetTextLineHeightWithSpacing();
 
     ImGui::SetCursorPos({(size.x-ImGui::CalcTextSize("v1.0.1").x)*0.5f,y});
@@ -1014,9 +1014,7 @@ void CoreSystem::render()
 {
     ImGui::ShowDemoWindow();
     ImGui::SetNextWindowPos({0, 0});
-    #ifndef GL_DEBUG
-    ImGui::SetNextWindowSize({width, showColors ? height : height-125});
-    #endif
+    ImGui::SetNextWindowSize({width,height});
 
     if(ImGui::IsKeyPressed(ImGuiKey_F1)){
         this->showAboutPage=true;

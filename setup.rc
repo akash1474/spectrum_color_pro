@@ -8,12 +8,12 @@ BEGIN
     BLOCK "080904E4"
     BEGIN
       VALUE "CompanyName", "Blank Coperation"
-      VALUE "FileDescription", "Simple OpenGL application with imgui and spdlog"
+      VALUE "FileDescription", "SpectrumColor Pro: Effortlessly pick, modify, and copy colors on Windows"
       VALUE "FileVersion", "1.0.0"
-      VALUE "InternalName", "GLFW OpenGL"
+      VALUE "InternalName", "SpectrumColor Pro"
       VALUE "LegalCopyright", "yes"
-      VALUE "OriginalFilename", "glfw_opengl.exe"
-      VALUE "ProductName", "GLFW OpenGL"
+      VALUE "OriginalFilename", "SpectrumColor.exe"
+      VALUE "ProductName", "SpectrumColor"
       VALUE "ProductVersion", "1.0"
     END
   END
