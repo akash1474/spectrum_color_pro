@@ -1,5 +1,7 @@
 @echo off
-set solution_name="Color Picker.sln"
+set solution_name=
+
+for %%i in ("*.sln") do set solution_name=%%i
 
 if /i [%1] == [run] goto :run
 
